@@ -14,6 +14,6 @@
     "description": "Marketplace e cardápio público do Menzzu.",
     "installation": "Atualize diretamente pelo painel do WordPress.",
     "changelog": "Estrutura inicial do plugin independente.",
-    "faq": "O pacote é distribuído pelo repositório privado do Menzzu."
+    "faq": "O pacote é distribuído pelo repositório público do Menzzu."
   }
 }
