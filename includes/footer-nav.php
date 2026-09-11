@@ -1,0 +1,68 @@
+<?php
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+if (!function_exists('menzzu_marketplace_render_directory_footer_nav')) {
+    function menzzu_marketplace_render_directory_footer_nav($args = [])
+    {
+        $args = array_merge([
+            'active' => 'home',
+            'homeUrl' => home_url('/'),
+            'restaurantsUrl' => menzzu_marketplace_restaurants_url(),
+            'blogUrl' => menzzu_marketplace_blog_url(),
+            'loginUrl' => menzzu_marketplace_login_url(),
+            'registerUrl' => home_url('/comprar/'),
+        ], $args);
+
+        $active = in_array($args['active'], ['home', 'restaurants', 'blog'], true) ? (string) $args['active'] : 'home';
+
+        $items = [
+            [
+                'key' => 'home',
+                'label' => 'Home',
+                'url' => $args['homeUrl'],
+                'icon' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 11.5L12 5l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6.2H9.5V21H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"></path></svg>',
+            ],
+            [
+                'key' => 'search',
+                'label' => 'Pesquisar',
+                'url' => '#pesquisa',
+                'icon' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.9"></circle><path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path></svg>',
+            ],
+            [
+                'key' => 'login',
+                'label' => 'Entrar',
+                'url' => $args['loginUrl'],
+                'icon' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-7 9a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+            ],
+            [
+                'key' => 'register',
+                'label' => 'Cadastro',
+                'url' => $args['registerUrl'],
+                'icon' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.9"></circle></svg>',
+            ],
+        ];
+
+        ob_start();
+?>
+        <nav class="menzzu-marketplace-footer-nav" aria-label="Navegacao inferior">
+            <div class="menzzu-marketplace-footer-nav-inner">
+                <?php foreach ($items as $item) : ?>
+                    <a
+                        class="menzzu-marketplace-footer-nav-link <?php echo $item['key'] === 'search' ? ' menzzu-marketplace-footer-nav-search' : ''; ?>"
+                        href="<?php echo esc_url($item['url']); ?>"
+                        <?php echo $item['key'] === 'search' ? 'data-menzzu-marketplace-nav-search' : ''; ?>
+                        <?php echo $active === $item['key'] ? 'aria-current="page"' : ''; ?>>
+                        <span class="menzzu-marketplace-footer-nav-icon" aria-hidden="true"><?php echo $item['icon']; ?></span>
+                        <span class="menzzu-marketplace-footer-nav-label"><?php echo esc_html($item['label']); ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </nav>
+<?php
+        return trim((string) ob_get_clean());
+    }
+}
+
