@@ -791,9 +791,15 @@ window.initMapsAutocomplete = () => {
             updateLocation(place.geometry.location, place.formatted_address);
         });
 
+        let addressTypingTimer = null;
         input.addEventListener('input', () => {
             input.dataset.placeSelected = '0';
             state.deliveryCoordinates = { lat: null, lng: null };
+            window.clearTimeout(addressTypingTimer);
+            const value = input.value.trim();
+            if (value.length >= 5) {
+                addressTypingTimer = window.setTimeout(() => geocodeAddress(value), 500);
+            }
         }, { passive: true });
 
         input.addEventListener('change', () => {
@@ -898,7 +904,7 @@ function updateLocation(location, address = null) {
         if (addressDisplay) addressDisplay.textContent = address;
         state.userInfo.address = address;
         localStorage.setItem('menzzu_user', JSON.stringify(state.userInfo));
-        calculateDeliveryFee(address);
+        return calculateDeliveryFee(address);
     }
 }
 
@@ -918,9 +924,19 @@ function syncSelectedAddress(address, coordinates = null) {
     } else {
         state.deliveryCoordinates = { lat: null, lng: null };
     }
-    const feePromise = calculateDeliveryFee(cleanAddress);
-    if (!coordinates && state.geocoder) geocodeAddress(cleanAddress);
-    return feePromise;
+    if (!coordinates && state.geocoder) {
+        return new Promise((resolve) => {
+            state.geocoder.geocode({ address: cleanAddress }, (results, status) => {
+                if (status === 'OK' && results[0]?.geometry) {
+                    resolve(updateLocation(results[0].geometry.location, results[0].formatted_address));
+                    return;
+                }
+                resolve(calculateDeliveryFee(cleanAddress));
+            });
+        });
+    }
+
+    return calculateDeliveryFee(cleanAddress);
 }
 
 function getDeliveryFeeCacheKey() {
@@ -2134,19 +2150,13 @@ function initEventListeners() {
     const mobileSearchToggle = document.getElementById('mobile-search-toggle');
     const searchContainer = document.getElementById('search-container');
 
-    window.addEventListener('menzzu-address-selected', async (event) => {
+    window.addEventListener('menzzu-address-saved', (event) => {
         const address = event.detail?.address || '';
-        const result = await syncSelectedAddress(address, event.detail?.coordinates || null);
-        const modal = document.getElementById('restaurant-location-modal');
-        const submitButton = modal?.querySelector('button[type="submit"]');
-        if (!result?.error && submitButton) {
-            submitButton.disabled = false;
-            submitButton.innerText = 'Confirmar endereço';
-        } else if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.innerText = 'Tentar novamente';
-            if (modal) modal.dataset.calculatedAddress = '';
-        }
+        if (!address) return;
+        state.userInfo.address = address;
+        localStorage.setItem('menzzu_user', JSON.stringify(state.userInfo));
+        const addressDisplay = document.getElementById('delivery-address-display');
+        if (addressDisplay) addressDisplay.textContent = address;
     });
 
     if (searchInput) {
