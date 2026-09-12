@@ -14,7 +14,7 @@
 
 <style>
 .menu-footer-institutional {
-    padding: 40px 0 120px;
+    padding: 40px 0 120px; /* Espaço para não bater no botão do carrinho */
     background: transparent;
     text-align: center;
     border-top: 1px solid rgba(0,0,0,0.05);
@@ -32,9 +32,10 @@
     text-decoration: none;
     font-size: 0.85rem;
     font-weight: 500;
+    transition: color 0.2s;
 }
 .footer-links a:hover {
-    color: var(--accent, #82F026);
+    color: #ff4d6d;
 }
 .footer-copyright {
     color: #999;
