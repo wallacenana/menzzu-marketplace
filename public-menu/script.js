@@ -82,7 +82,6 @@ let state = {
     },
     currentStep: 1,
     deliveryFee: 0,
-    deliveryFeeCalculated: false,
     googleMap: null,
     mapMarker: null,
     geocoder: null,
@@ -867,8 +866,6 @@ function reverseGeocode(latLng) {
 }
 
 async function calculateDeliveryFee(address) {
-    state.deliveryFeeCalculated = false;
-    updateDeliveryFeeButtonState();
     try {
         const response = await fetch(`${API_BASE}/orders/calculate-fee`, {
             method: 'POST',
@@ -882,9 +879,9 @@ async function calculateDeliveryFee(address) {
         });
         const data = await response.json();
         const display = document.getElementById('delivery-fee-display');
+        const locationFeeDisplay = document.getElementById('restaurant-location-fee');
         if (data.fee !== undefined) {
             state.deliveryFee = data.fee;
-            state.deliveryFeeCalculated = true;
             state.allowCash = data.type === 'estimated' ? false : (data.allowCash !== false);
             if (display) {
                 display.style.display = 'block';
@@ -892,11 +889,14 @@ async function calculateDeliveryFee(address) {
                 display.style.background = '#f0fdf4';
                 display.style.color = '#166534';
             }
+            if (locationFeeDisplay) {
+                locationFeeDisplay.hidden = false;
+                locationFeeDisplay.className = 'restaurant-location-fee is-success';
+                locationFeeDisplay.innerHTML = `Taxa calculada: <strong>R$ ${Number(data.fee).toFixed(2).replace('.', ',')}</strong>`;
+            }
             updateStep4Summary();
-            saveCheckoutState();
         } else if (data.error) {
             state.deliveryFee = 0;
-            state.deliveryFeeCalculated = false;
             state.allowCash = false;
             if (display) {
                 display.style.display = 'block';
@@ -905,16 +905,25 @@ async function calculateDeliveryFee(address) {
                 display.style.color = '#991b1b';
                 display.style.border = '1px solid #fee2e2';
             }
+            if (locationFeeDisplay) {
+                locationFeeDisplay.hidden = false;
+                locationFeeDisplay.className = 'restaurant-location-fee is-error';
+                locationFeeDisplay.innerText = data.error;
+            }
         } else {
-            state.deliveryFeeCalculated = false;
             if (display) display.style.display = 'none';
         }
+        return data;
     } catch (err) {
-        state.deliveryFeeCalculated = false;
-        updateDeliveryFeeButtonState();
         console.error('Erro ao calcular frete:', err);
+        const locationFeeDisplay = document.getElementById('restaurant-location-fee');
+        if (locationFeeDisplay) {
+            locationFeeDisplay.hidden = false;
+            locationFeeDisplay.className = 'restaurant-location-fee is-error';
+            locationFeeDisplay.innerText = 'Não foi possível calcular a taxa agora.';
+        }
+        return { error: 'Não foi possível calcular a taxa agora.' };
     }
-    updateDeliveryFeeButtonState();
 }
 
 function maskPhone(v) {
@@ -2039,6 +2048,21 @@ function initEventListeners() {
     const mobileSearchToggle = document.getElementById('mobile-search-toggle');
     const searchContainer = document.getElementById('search-container');
 
+    window.addEventListener('menzzu-address-selected', async (event) => {
+        const address = event.detail?.address || '';
+        const result = await calculateDeliveryFee(address);
+        const modal = document.getElementById('restaurant-location-modal');
+        const submitButton = modal?.querySelector('button[type="submit"]');
+        if (result?.fee !== undefined && submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerText = 'Confirmar endereço';
+        } else if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerText = 'Tentar novamente';
+            if (modal) modal.dataset.calculatedAddress = '';
+        }
+    });
+
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             state.searchQuery = e.target.value;
@@ -2184,12 +2208,6 @@ function initEventListeners() {
         if (el) {
             el.addEventListener('input', (e) => {
                 state.userInfo[id.split('-')[1]] = e.target.value;
-                if (id === 'user-address' && state.deliveryType === 'delivery') {
-                    state.deliveryFee = 0;
-                    state.deliveryFeeCalculated = false;
-                    updateDeliveryFeeButtonState();
-                    saveCheckoutState();
-                }
                 localStorage.setItem('menzzu_user', JSON.stringify(state.userInfo));
             });
         }
@@ -2234,17 +2252,6 @@ function goToStep(step) {
     if (step === 4) {
         updateStep4Summary();
     }
-    updateDeliveryFeeButtonState();
-}
-
-function updateDeliveryFeeButtonState() {
-    const pending = state.activeTab === 'delivery'
-        && state.deliveryType === 'delivery'
-        && !state.deliveryFeeCalculated;
-    const nextButton = document.getElementById('next-step-btn');
-    const placeButton = document.getElementById('place-order-btn');
-    if (nextButton && state.currentStep === 2) nextButton.disabled = pending;
-    if (placeButton && state.currentStep === 4) placeButton.disabled = pending;
 }
 
 // Persist/restore checkout progress so the user can resume where they left off
@@ -2255,7 +2262,6 @@ function saveCheckoutState() {
         deliveryType: state.deliveryType,
         paymentMethod: state.paymentMethod,
         deliveryFee: state.deliveryFee || 0,
-        deliveryFeeCalculated: state.deliveryFeeCalculated === true,
         orderSchedule: state.orderSchedule || null,
         orderDetailsInfo: state.orderDetailsInfo || '',
         expires: Date.now() + (24 * 60 * 60 * 1000)
@@ -2284,7 +2290,6 @@ function restoreCheckoutState() {
     }
     if (saved.paymentMethod) state.paymentMethod = saved.paymentMethod;
     if (typeof saved.deliveryFee === 'number') state.deliveryFee = saved.deliveryFee;
-    state.deliveryFeeCalculated = saved.deliveryFeeCalculated === true;
     if (saved.orderSchedule && typeof saved.orderSchedule === 'object') {
         state.orderSchedule = {
             date: saved.orderSchedule.date || '',
@@ -2319,7 +2324,7 @@ function getResumeStep() {
     if (state.activeTab === 'delivery') {
         if (state.deliveryType === 'delivery') {
             if (!state.userInfo.address) return 2;
-            if (!state.deliveryFeeCalculated) return 2;
+            if (!state.deliveryFee) return 2;
         }
     } else {
         if (!state.orderSchedule?.date || !state.orderSchedule?.time) return 1;
@@ -2564,14 +2569,10 @@ function setDeliveryType(type) {
             calculateDeliveryFee(state.userInfo.address);
         } else {
             state.deliveryFee = 0;
-            state.deliveryFeeCalculated = false;
-            updateDeliveryFeeButtonState();
             updateStep4Summary();
         }
     } else {
         state.deliveryFee = 0;
-        state.deliveryFeeCalculated = false;
-        updateDeliveryFeeButtonState();
         updateStep4Summary();
     }
 }
@@ -2601,7 +2602,7 @@ async function handleNextStep() {
     } else if (state.currentStep === 2) {
         if (state.activeTab === 'delivery') {
             if (state.deliveryType === 'delivery' && !state.userInfo.address) return showAlert('Endereço Ausente', 'Por favor, selecione seu endereço no mapa.');
-            if (!state.deliveryFeeCalculated && state.deliveryType === 'delivery' && state.userInfo.address) {
+            if (state.deliveryFee === 0 && state.deliveryType === 'delivery' && state.userInfo.address) {
                 return showAlert('Taxa Indisponível', 'Por favor, aguarde o cálculo da taxa de entrega ou verifique se o endereço está no raio de entrega.');
             }
         } else if (state.activeTab === 'order') {
