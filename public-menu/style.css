@@ -1039,7 +1039,7 @@ h3 {
     gap: 16px;
     border-left: 1px solid var(--border);
     background: var(--bg-color);
-    min-height: 0;
+    min-height: 240px;
 }
 
 .item-detail-panel>.modal-footer-sticky {
@@ -1103,6 +1103,17 @@ body.theme-dark .var-option.selected {
     font-size: 0.85rem;
     color: var(--text-gray);
     font-weight: 700;
+}
+
+.variation-subitems {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.variation-subitems .subitem-option {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 /* Addons / Complements inside detail */
@@ -1300,6 +1311,7 @@ body.theme-dark .var-option.selected {
     font-weight: 700;
     min-width: 20px;
     text-align: center;
+    font-size: 0.95rem;
 }
 
 /* Primary Button */
@@ -1310,8 +1322,8 @@ body.theme-dark .var-option.selected {
     border: none;
     padding: 14px;
     border-radius: 8px;
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 600;
+    font-size: 15px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -2096,9 +2108,24 @@ body.theme-dark .delivery-fee-badge {
 
     #item-detail-modal .item-detail-content {
         width: 100vw;
+        height: 100dvh;
         max-width: none;
         max-height: 100dvh;
         border-radius: 0;
+    }
+
+    #item-detail-modal #item-detail-body {
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    #item-detail-modal .item-detail-layout {
+        height: auto;
+        min-height: 100%;
+    }
+
+    #item-detail-modal .item-detail-panel {
+        overflow: visible;
     }
 }
 
