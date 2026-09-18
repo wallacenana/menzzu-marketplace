@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 /**
  * Menzzu - Cardápio digital (Versão Checkout 2.0)
