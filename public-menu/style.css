@@ -1218,6 +1218,40 @@ body.theme-dark .var-option.selected {
     transform: translateY(-1px);
 }
 
+.order-bump-section {
+    margin-top: 18px;
+}
+
+.order-bump-option {
+    align-items: center;
+    gap: 12px;
+    --addon-accent: var(--primary-color);
+}
+
+.order-bump-image {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: var(--bg-gray);
+}
+
+.order-bump-copy {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.order-bump-description {
+    color: var(--text-gray);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 .addon-option.selected {
     border-color: var(--addon-accent, var(--primary-color));
     background: var(--text-main);

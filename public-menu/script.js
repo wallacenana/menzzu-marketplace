@@ -1569,16 +1569,18 @@ function openItemDetail(productId) {
         })();
 
         const suggestedItem = getSuggestedProductForItem(item);
+        const suggestedItemImages = suggestedItem ? parseImages(suggestedItem.image) : [];
         const orderBumpHtml = suggestedItem ? `
-                <div class="variation-section addon-group-section order-bump-section" style="margin-top: 18px;">
+                <div class="variation-section addon-group-section order-bump-section">
                     <div class="addon-group-header">
                         <h4>Leve também</h4>
                         <span class="addon-group-badge optional">Sugestão</span>
                     </div>
-                    <label class="var-option addon-option order-bump-option ${state.orderBumpSelected ? 'selected' : ''}" style="--addon-accent: var(--primary-color);" onclick="toggleOrderBumpSelect(event)">
-                        <div class="addon-option-main">
+                    <label class="var-option addon-option order-bump-option ${state.orderBumpSelected ? 'selected' : ''}" onclick="toggleOrderBumpSelect(event)">
+                        ${suggestedItemImages.length > 0 ? `<img class="order-bump-image" src="${getImg(suggestedItemImages[0], 'thumb')}" alt="${suggestedItem.name}">` : ''}
+                        <div class="order-bump-copy">
                             <span class="var-label">${suggestedItem.name}</span>
-                            <span style="font-size:12px; color:var(--text-gray); margin-top: 4px;">${suggestedItem.description || 'Sugestão para complementar o pedido.'}</span>
+                            <span class="order-bump-description">${suggestedItem.description || 'Sugestão para complementar o pedido.'}</span>
                         </div>
                         <div class="addon-option-meta">
                             <span class="var-price addon-option-price">${getDisplayPriceText(suggestedItem)}</span>
