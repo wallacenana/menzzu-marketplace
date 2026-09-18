@@ -1504,9 +1504,17 @@ function openItemDetail(productId) {
                         </div>
                     `;
 
-        const variationsHtml = variations.length > 0 ?
-            `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map(v => { const price = getVariationPrice(v, item); const hasSubItemOverrides = (Array.isArray(v.subItems) ? v.subItems : []).some(subItem => getEffectiveProductPrice(subItem) > 0); const priceLabel = hasSubItemOverrides ? `A partir de ${formatDisplayPrice(price)}` : formatDisplayPrice(price); return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getResolvedProductPrice(v, item)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`; }).join('')}</div>` :
-            '';
+        const variationPrices = variations.map(variation => getVariationPrice(variation, item));
+        const positiveVariationPrices = variationPrices.filter(price => Number.isFinite(price) && price > 0);
+        const minimumVariationPrice = positiveVariationPrices.length > 0 ? Math.min(...positiveVariationPrices) : 0;
+        const variationsHtml = variations.length > 0
+            ? `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map((v, index) => {
+                const price = variationPrices[index];
+                const priceDelta = price > minimumVariationPrice ? price - minimumVariationPrice : 0;
+                const priceLabel = priceDelta > 0 ? `+ ${formatDisplayPrice(priceDelta)}` : '';
+                return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getResolvedProductPrice(v, item)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`;
+            }).join('')}</div>`
+            : '';
 
         const customFieldsHtml = state.activeTab === 'order' ? '' : (() => {
             let cfHtml = '';
