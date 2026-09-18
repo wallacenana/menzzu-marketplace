@@ -1768,7 +1768,6 @@ function renderVariationAccordion() {
         const indicator = document.createElement('span');
         indicator.className = 'variation-accordion-indicator';
         indicator.textContent = '+';
-        indicator.style.cssText = 'margin-left: 0; flex: 0 0 24px; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: var(--primary-color); background: color-mix(in srgb, var(--primary-color) 12%, transparent); font-size: 20px; line-height: 1; transition: transform 220ms ease, background 220ms ease;';
         row.appendChild(indicator);
         row.style.cursor = 'pointer';
         row.style.gap = '12px';
@@ -1793,8 +1792,7 @@ function renderVariationAccordion() {
                 item.setAttribute('aria-expanded', 'false');
                 const itemIndicator = item.querySelector('.variation-accordion-indicator');
                 if (itemIndicator) {
-                    itemIndicator.style.transform = 'rotate(0deg)';
-                    itemIndicator.style.background = 'color-mix(in srgb, var(--primary-color) 12%, transparent)';
+                    itemIndicator.classList.remove('is-open');
                 }
             });
 
@@ -1804,8 +1802,7 @@ function renderVariationAccordion() {
                 details.classList.add('is-open');
                 row.classList.add('selected');
                 row.setAttribute('aria-expanded', 'true');
-                indicator.style.transform = 'rotate(45deg)';
-                indicator.style.background = 'color-mix(in srgb, var(--primary-color) 20%, transparent)';
+                indicator.classList.add('is-open');
             }
         });
         row.insertAdjacentElement('afterend', details);

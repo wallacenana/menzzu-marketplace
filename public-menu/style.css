@@ -1105,6 +1105,29 @@ body.theme-dark .var-option.selected {
     font-weight: 700;
 }
 
+.variation-accordion-indicator {
+    flex: 0 0 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 0;
+    border-radius: 50%;
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+    font-family: Arial, sans-serif;
+    font-size: 20px;
+    line-height: 0;
+    padding-bottom: 1px;
+    transition: transform 220ms ease, background 220ms ease;
+}
+
+.variation-accordion-indicator.is-open {
+    transform: rotate(45deg);
+    background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+
 .variation-subitems {
     display: none;
     margin: -2px 0 10px;
