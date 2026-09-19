@@ -78,6 +78,7 @@ let state = {
         businessCategory: '',
         prepTime: '',
         acceptOrders: true,
+        acceptSameDayOrders: false,
         featuredCountDesktop: 4,
         featuredCountTablet: 2,
         featuredCountMobile: 1
@@ -347,10 +348,12 @@ function openScheduleModal(context = 'add') {
     const dateInput = document.getElementById('schedule-date');
     const timeSelect = document.getElementById('schedule-time');
     const note = document.getElementById('schedule-availability-note');
-    const today = getBrazilDateString();
+    const earliestDate = getEarliestOrderDate();
     if (dateInput) {
-        dateInput.min = today;
-        dateInput.value = state.orderSchedule?.date || getBrazilDateAfterDays(1);
+        dateInput.min = earliestDate;
+        dateInput.value = state.orderSchedule?.date >= earliestDate
+            ? state.orderSchedule.date
+            : earliestDate;
     }
     if (timeSelect) {
         timeSelect.disabled = true;
@@ -431,13 +434,19 @@ function getBrazilDateAfterDays(days) {
     return getBrazilDateString(date);
 }
 
+function getEarliestOrderDate() {
+    return state.publicSettings.acceptSameDayOrders === true
+        ? getBrazilDateString()
+        : getBrazilDateAfterDays(1);
+}
+
 function setOrderDateConstraints() {
     const dateInput = document.getElementById('schedule-date');
     if (!dateInput) return;
 
-    const today = getBrazilDateString();
-    dateInput.min = today;
-    if (dateInput.value && dateInput.value < today) {
+    const earliestDate = getEarliestOrderDate();
+    dateInput.min = earliestDate;
+    if (dateInput.value && dateInput.value < earliestDate) {
         dateInput.value = '';
     }
 }
@@ -451,7 +460,7 @@ async function loadOrderAvailability(dateStr, preserveSelection = true, config =
     const noteEl = noteId ? document.getElementById(noteId) : null;
     if (!timeSelect) return null;
 
-    const today = getBrazilDateString();
+    const earliestDate = getEarliestOrderDate();
     const cleanDate = (dateStr || '').trim();
     const previousValue = timeSelect.value;
 
@@ -463,17 +472,20 @@ async function loadOrderAvailability(dateStr, preserveSelection = true, config =
         return null;
     }
 
-    if (cleanDate < today) {
+    if (cleanDate < earliestDate) {
         if (dateInput) dateInput.value = '';
+        const reason = cleanDate < getBrazilDateString()
+            ? 'Data anterior a hoje.'
+            : 'Encomendas para o mesmo dia ficam disponíveis a partir de amanhã.';
         state.orderAvailability = {
             available: false,
-            reason: 'Data anterior a hoje.',
+            reason,
             date: cleanDate,
             times: []
         };
         timeSelect.disabled = true;
         timeSelect.innerHTML = `<option value="">Escolha uma data válida</option>`;
-        if (noteEl) noteEl.innerText = 'Data anterior a hoje.';
+        if (noteEl) noteEl.innerText = state.orderAvailability.reason;
         return state.orderAvailability;
     }
 
@@ -2367,8 +2379,8 @@ function initEventListeners() {
     if (scheduleDateInput) {
         const handleScheduleDateChange = async (e) => {
             const dateStr = e.target.value;
-            const today = getBrazilDateString();
-            if (dateStr && dateStr < today) {
+            const earliestDate = getEarliestOrderDate();
+            if (dateStr && dateStr < earliestDate) {
                 e.target.value = '';
                 await loadOrderAvailability('', false, {
                     timeSelectId: 'schedule-time',
