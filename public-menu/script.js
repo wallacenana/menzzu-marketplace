@@ -233,14 +233,29 @@ function getImg(url, size = 'full') {
     return url;
 }
 
-function isOrderEnabled() {
+function areOrdersPaused() {
+    return state.publicSettings.acceptOrders === false;
+}
+
+function isOrderTabVisible() {
     const options = getMenuDeliveryOptions();
-    return state.publicSettings.acceptOrders !== false && options.orderTypes.order !== false;
+    return options.orderTypes.order !== false;
+}
+
+function isOrderEnabled() {
+    return !areOrdersPaused() && isOrderTabVisible();
+}
+
+function isDeliveryTabVisible() {
+    return getMenuDeliveryOptions().orderTypes.delivery !== false;
 }
 
 function isDeliveryTabEnabled() {
-    return state.publicSettings.acceptOrders !== false
-        && getMenuDeliveryOptions().orderTypes.delivery !== false;
+    return !areOrdersPaused() && isDeliveryTabVisible();
+}
+
+function showOrdersPausedAlert() {
+    return showAlert('Pedidos pausados', 'A loja está fechada para novos pedidos no momento. Você pode continuar consultando o cardápio.');
 }
 
 function getMenuDeliveryOptions() {
@@ -663,15 +678,15 @@ function hydrateFromSSR() {
         state.storeRecentReviews = data.recentReviews || state.storeRecentReviews || [];
         state.loading = false;
 
-        const deliveryEnabled = isDeliveryTabEnabled();
-        const orderEnabled = isOrderEnabled();
-        if (state.activeTab === 'order' && !orderEnabled && deliveryEnabled) {
+        const deliveryVisible = isDeliveryTabVisible();
+        const orderVisible = isOrderTabVisible();
+        if (state.activeTab === 'order' && !orderVisible && deliveryVisible) {
             state.activeTab = 'delivery';
             document.body.classList.remove('theme-order');
-        } else if (state.activeTab === 'delivery' && !deliveryEnabled && orderEnabled) {
+        } else if (state.activeTab === 'delivery' && !deliveryVisible && orderVisible) {
             state.activeTab = 'order';
             document.body.classList.add('theme-order');
-        } else if (!deliveryEnabled && !orderEnabled) {
+        } else if (!deliveryVisible && !orderVisible) {
             state.activeTab = 'delivery';
             document.body.classList.remove('theme-order');
         }
@@ -1185,7 +1200,7 @@ function renderMenu() {
         }
 
         const matchesSearch = p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
-        const matchesTab = (state.activeTab === 'delivery' && isDeliveryTabEnabled() && p.type === 'delivery') || (state.activeTab === 'order' && isOrderEnabled());
+        const matchesTab = (state.activeTab === 'delivery' && isDeliveryTabVisible() && p.type === 'delivery') || (state.activeTab === 'order' && isOrderTabVisible());
         return matchesTab && matchesSearch;
     });
 
@@ -2303,7 +2318,7 @@ function initEventListeners() {
     }
     document.querySelectorAll('.cat-tab').forEach(btn => {
         btn.addEventListener('click', () => {
-            if (btn.dataset.tab === 'order' && !isOrderEnabled()) return;
+            if (btn.dataset.tab === 'order' && !isOrderTabVisible()) return;
             document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             state.activeTab = btn.dataset.tab;
@@ -2921,6 +2936,7 @@ function updateStep4Summary() {
 }
 
 function addToCart() {
+    if (areOrdersPaused()) return showOrdersPausedAlert();
     if (state.activeTab === 'order') {
         const precheck = validateCurrentItemSelections();
         if (!precheck.ok) {
@@ -2937,6 +2953,7 @@ function addToCart() {
 
 function commitAddToCart() {
     const item = state.currentItem;
+    if (areOrdersPaused()) return showOrdersPausedAlert();
     if (state.activeTab === 'delivery' && !state.isOpen) {
         return showAlert('Loja Fechada', isOrderEnabled() ?
             'Estamos fechados para pronta entrega no momento. Utilize a aba de Encomendas para agendar!' :
@@ -3090,6 +3107,7 @@ function updateUI() {
 async function handlePlaceOrder() {
     let cart = getActiveCart();
     const btn = document.getElementById('place-order-btn');
+    if (areOrdersPaused()) return showOrdersPausedAlert();
     btn.disabled = true;
     btn.innerHTML = state.paymentMethod === 'dinheiro' ? 'Enviando Pedido...' : 'Processando Pagamento...';
 
