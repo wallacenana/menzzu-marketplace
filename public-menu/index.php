@@ -214,7 +214,11 @@ try {
         $cacheSettingsStmt->execute([$slug]);
         $cacheSettings = $cacheSettingsStmt->fetch(PDO::FETCH_ASSOC);
         if ($cacheSettings) {
-            $cacheAcceptOrders = (bool) $cacheSettings['acceptOrders'];
+            $cacheAcceptOrders = !in_array(
+                strtolower(trim((string) $cacheSettings['acceptOrders'])),
+                ['0', 'false', 'off', 'no'],
+                true
+            );
             $cacheVersionStamp = md5(json_encode($cacheSettings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         }
     } catch (Exception $e) {
@@ -298,7 +302,10 @@ try {
     $surfaceSoftColor = $isDarkTheme ? '#06231e' : 'color-mix(in srgb, var(--bg-color) 90%, #ffffff 10%)';
     $borderColor = $isDarkTheme ? 'color-mix(in srgb, ' . $accentColor . ' 16%, transparent)' : 'rgba(0, 0, 0, 0.08)';
     $textSecondary = $isDarkTheme ? 'rgba(255,255,255,0.72)' : ($textColor ? $textColor . '99' : 'rgba(102,102,102,0.6)');
-    $acceptOrders = isset($store['acceptOrders']) ? (bool) $store['acceptOrders'] : true;
+    // MySQL returns booleans as strings. In PHP, (bool) '0' is true, which
+    // incorrectly left paused stores displayed as open in the public menu.
+    $acceptOrders = !isset($store['acceptOrders'])
+        || !in_array(strtolower(trim((string) $store['acceptOrders'])), ['0', 'false', 'off', 'no'], true);
     $acceptSameDayOrders = isset($store['acceptSameDayOrders']) ? (bool) $store['acceptSameDayOrders'] : false;
     $prepTimeLabel = formatPrepTimeLabel($store['prepTime'] ?? '');
 
@@ -342,8 +349,12 @@ try {
     $showOrderTab = $acceptOrders && !empty($deliveryMenuOptions['orderTypes']['order']);
     $showOrderTabsNav = $showDeliveryTab && $showOrderTab;
     $orderOnlyMode = !$showDeliveryTab && $showOrderTab;
-    $initialStatusLabel = $orderOnlyMode ? 'Apenas encomendas' : ($marketplaceReady ? 'Aberto' : 'Inativo');
-    $initialStatusClass = $orderOnlyMode ? 'order-only' : ($marketplaceReady ? 'open' : 'closed');
+    $initialStatusLabel = !$acceptOrders
+        ? 'Fechado agora'
+        : ($orderOnlyMode ? 'Apenas encomendas' : ($marketplaceReady ? 'Aberto' : 'Inativo'));
+    $initialStatusClass = !$acceptOrders
+        ? 'closed'
+        : ($orderOnlyMode ? 'order-only' : ($marketplaceReady ? 'open' : 'closed'));
 
     $stmt = $pdo->prepare("SELECT sr.id, sr.orderId, sr.clientName, sr.rating, sr.comment, sr.createdAt, o.product, o.variation FROM store_review sr LEFT JOIN `order` o ON o.id = sr.orderId WHERE sr.userId = ? ORDER BY sr.createdAt DESC LIMIT 6");
     $stmt->execute([$store['id']]);
