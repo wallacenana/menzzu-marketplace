@@ -266,6 +266,9 @@ function getMenuDeliveryOptions() {
     const fulfillmentMethods = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.fulfillmentMethods && typeof parsed.fulfillmentMethods === 'object'
         ? parsed.fulfillmentMethods
         : {};
+    const orderFulfillmentMethods = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.orderFulfillmentMethods && typeof parsed.orderFulfillmentMethods === 'object'
+        ? parsed.orderFulfillmentMethods
+        : fulfillmentMethods;
 
     return {
         orderTypes: {
@@ -276,8 +279,17 @@ function getMenuDeliveryOptions() {
             delivery: fulfillmentMethods.delivery !== false,
             pickup: fulfillmentMethods.pickup !== false,
             local: fulfillmentMethods.local !== false
+        },
+        orderFulfillmentMethods: {
+            delivery: orderFulfillmentMethods.delivery !== false,
+            pickup: orderFulfillmentMethods.pickup !== false,
+            local: orderFulfillmentMethods.local !== false
         }
     };
+}
+
+function isOrderDeliveryEnabled() {
+    return getMenuDeliveryOptions().orderFulfillmentMethods.delivery !== false;
 }
 
 function isFulfillmentMethodEnabled(method) {
@@ -1200,7 +1212,11 @@ function renderMenu() {
         }
 
         const matchesSearch = p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
-        const matchesTab = (state.activeTab === 'delivery' && isDeliveryTabVisible() && p.type === 'delivery') || (state.activeTab === 'order' && isOrderTabVisible());
+        const productType = String(p.type || 'delivery').toLowerCase();
+        const isDeliveryProduct = productType === 'delivery' || productType === 'combo_delivery';
+        const isOrderProduct = productType === 'encomenda' || (productType.startsWith('combo_') && !isDeliveryProduct);
+        const matchesTab = (state.activeTab === 'delivery' && isDeliveryTabVisible() && isDeliveryProduct)
+            || (state.activeTab === 'order' && isOrderTabVisible() && (isOrderProduct || (isOrderDeliveryEnabled() && isDeliveryProduct)));
         return matchesTab && matchesSearch;
     });
 
