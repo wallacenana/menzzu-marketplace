@@ -124,9 +124,9 @@ try {
                 'local' => true
             ],
             'orderFulfillmentMethods' => [
-                'delivery' => true,
+                'delivery' => false,
                 'pickup' => true,
-                'local' => true
+                'local' => false
             ]
         ];
 
@@ -152,7 +152,7 @@ try {
         $fulfillmentMethods = is_array($parsed['fulfillmentMethods'] ?? null) ? $parsed['fulfillmentMethods'] : [];
         $orderFulfillmentMethods = is_array($parsed['orderFulfillmentMethods'] ?? null)
             ? $parsed['orderFulfillmentMethods']
-            : $fulfillmentMethods;
+            : $default['orderFulfillmentMethods'];
 
         return [
             'orderTypes' => [
@@ -165,9 +165,9 @@ try {
                 'local' => array_key_exists('local', $fulfillmentMethods) ? (bool) $fulfillmentMethods['local'] : true,
             ],
             'orderFulfillmentMethods' => [
-                'delivery' => array_key_exists('delivery', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['delivery'] : true,
+                'delivery' => array_key_exists('delivery', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['delivery'] : false,
                 'pickup' => array_key_exists('pickup', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['pickup'] : true,
-                'local' => array_key_exists('local', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['local'] : true,
+                'local' => array_key_exists('local', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['local'] : false,
             ]
         ];
     }

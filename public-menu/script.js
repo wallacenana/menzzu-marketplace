@@ -268,7 +268,7 @@ function getMenuDeliveryOptions() {
         : {};
     const orderFulfillmentMethods = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.orderFulfillmentMethods && typeof parsed.orderFulfillmentMethods === 'object'
         ? parsed.orderFulfillmentMethods
-        : fulfillmentMethods;
+        : { delivery: false, pickup: true, local: false };
 
     return {
         orderTypes: {
@@ -281,9 +281,9 @@ function getMenuDeliveryOptions() {
             local: fulfillmentMethods.local !== false
         },
         orderFulfillmentMethods: {
-            delivery: orderFulfillmentMethods.delivery !== false,
+            delivery: orderFulfillmentMethods.delivery === true,
             pickup: orderFulfillmentMethods.pickup !== false,
-            local: orderFulfillmentMethods.local !== false
+            local: orderFulfillmentMethods.local === true
         }
     };
 }
