@@ -1100,16 +1100,10 @@ body.theme-dark .var-option.selected {
 }
 
 .var-price {
-    display: inline-flex;
-    align-items: center;
-    min-height: 26px;
-    padding: 0 9px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--primary-color) 8%, transparent);
-    color: color-mix(in srgb, var(--primary-color) 74%, var(--text-main));
-    font-size: 0.78rem;
-    font-weight: 700;
-    line-height: 1;
+    color: var(--text-main);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.25;
     white-space: nowrap;
 }
 
@@ -1118,8 +1112,7 @@ body.theme-dark .var-option.selected {
 }
 
 .var-option.selected > .var-price {
-    background: color-mix(in srgb, var(--primary-color) 16%, transparent);
-    color: var(--primary-color);
+    color: var(--text-main);
 }
 
 .variation-accordion-indicator {

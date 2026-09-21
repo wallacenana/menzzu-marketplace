@@ -1538,13 +1538,10 @@ function openItemDetail(productId) {
                     `;
 
         const variationPrices = variations.map(variation => getVariationPrice(variation, item));
-        const positiveVariationPrices = variationPrices.filter(price => Number.isFinite(price) && price > 0);
-        const minimumVariationPrice = positiveVariationPrices.length > 0 ? Math.min(...positiveVariationPrices) : 0;
         const variationsHtml = variations.length > 0
             ? `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map((v, index) => {
                 const price = variationPrices[index];
-                const priceDelta = price > minimumVariationPrice ? price - minimumVariationPrice : 0;
-                const priceLabel = priceDelta > 0 ? `+ ${formatDisplayPrice(priceDelta)}` : '';
+                const priceLabel = price > 0 ? formatDisplayPrice(price) : '';
                 return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getResolvedProductPrice(v, item)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`;
             }).join('')}</div>`
             : '';
@@ -1782,7 +1779,6 @@ function renderVariationAccordion() {
             title.style.cssText = 'margin-bottom: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 700;';
             detailsInner.appendChild(title);
 
-            const basePrice = getResolvedProductPrice(variation, state.currentItem);
             subItems.forEach(subItem => {
                 const option = document.createElement('div');
                 option.className = 'var-option subitem-option';
@@ -1793,9 +1789,8 @@ function renderVariationAccordion() {
                 option.innerHTML = '<div class="var-label"></div><div class="var-price"></div>';
                 option.querySelector('.var-label').textContent = subItem.name || 'Opção';
                 const price = getResolvedProductPrice(subItem, variation, state.currentItem);
-                const priceDelta = price > basePrice ? price - basePrice : 0;
-                option.querySelector('.var-price').textContent = priceDelta > 0
-                    ? `+ ${formatDisplayPrice(priceDelta)}`
+                option.querySelector('.var-price').textContent = price > 0
+                    ? formatDisplayPrice(price)
                     : '';
                 option.querySelector('.var-label').style.cssText = 'min-width: 0; flex: 1 1 auto;';
                 option.querySelector('.var-price').style.cssText = 'margin-left: auto; flex: 0 0 auto; white-space: nowrap;';
