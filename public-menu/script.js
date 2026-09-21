@@ -284,12 +284,13 @@ function getMenuDeliveryOptions() {
             delivery: orderFulfillmentMethods.delivery === true,
             pickup: orderFulfillmentMethods.pickup !== false,
             local: orderFulfillmentMethods.local === true
-        }
+        },
+        includeDeliveryItemsInOrders: parsed?.includeDeliveryItemsInOrders === true
     };
 }
 
 function isOrderDeliveryEnabled() {
-    return getMenuDeliveryOptions().orderFulfillmentMethods.delivery !== false;
+    return getMenuDeliveryOptions().includeDeliveryItemsInOrders === true;
 }
 
 function isFulfillmentMethodEnabled(method) {

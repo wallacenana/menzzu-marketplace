@@ -127,7 +127,8 @@ try {
                 'delivery' => false,
                 'pickup' => true,
                 'local' => false
-            ]
+            ],
+            'includeDeliveryItemsInOrders' => false
         ];
 
         if (empty($value)) {
@@ -168,7 +169,8 @@ try {
                 'delivery' => array_key_exists('delivery', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['delivery'] : false,
                 'pickup' => array_key_exists('pickup', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['pickup'] : true,
                 'local' => array_key_exists('local', $orderFulfillmentMethods) ? (bool) $orderFulfillmentMethods['local'] : false,
-            ]
+            ],
+            'includeDeliveryItemsInOrders' => !empty($parsed['includeDeliveryItemsInOrders'])
         ];
     }
 
