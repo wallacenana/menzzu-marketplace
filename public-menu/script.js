@@ -1226,6 +1226,10 @@ function renderMenu() {
 
     const grouped = {};
     const sortedCategories = [];
+    const categoryOrders = new Map((state.categories || []).map(category => [
+        String(category.name || ''),
+        Number.isFinite(Number(category.order)) ? Number(category.order) : Number.MAX_SAFE_INTEGER
+    ]));
     nonFeatured.forEach(p => {
         let cat = 'Geral';
         if (p.categoryId && state.categories && state.categories.length > 0) {
@@ -1240,6 +1244,14 @@ function renderMenu() {
             sortedCategories.push(cat);
         }
         grouped[cat].push(p);
+    });
+
+    // Preserve the sequence defined in category management, independently
+    // from the display order of the products in each category.
+    sortedCategories.sort((left, right) => {
+        const leftOrder = categoryOrders.get(String(left)) ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = categoryOrders.get(String(right)) ?? Number.MAX_SAFE_INTEGER;
+        return leftOrder - rightOrder || String(left).localeCompare(String(right), 'pt-BR');
     });
 
     let html = '';
