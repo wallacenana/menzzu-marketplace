@@ -1598,10 +1598,13 @@ function openItemDetail(productId) {
         const minimumVariationPrice = variationPrices
             .filter(price => Number.isFinite(price) && price > 0)
             .reduce((minimum, price) => Math.min(minimum, price), Infinity);
+        const hasDifferentVariationPrices = variationPrices.some(price => (
+            Number.isFinite(price) && price > 0 && Math.abs(price - minimumVariationPrice) >= 0.005
+        ));
         const variationsHtml = variations.length > 0
             ? `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map((v, index) => {
                 const price = variationPrices[index];
-                const priceLabel = price > 0
+                const priceLabel = hasDifferentVariationPrices && price > 0
                     ? (Math.abs(price - minimumVariationPrice) < 0.005
                         ? formatDisplayPrice(price)
                         : formatPriceDifference(price, minimumVariationPrice))
@@ -2042,6 +2045,10 @@ function getOrderAddonsJSON(item) {
 }
 
 function updateDetailFooter() {
+    const variations = JSON.parse(state.currentItem?.variations || '[]').filter(variation => !variation.hidden);
+    const selectedSubItems = (state.currentVariation?.subItems || []).filter(subItem => !subItem.hidden);
+    const needsSelection = (variations.length > 0 && !state.currentVariation)
+        || (selectedSubItems.length > 0 && !state.currentSubItem);
     const basePrice = getSelectedItemPrice();
     const {
         addonTotal
@@ -2050,7 +2057,12 @@ function updateDetailFooter() {
     const bumpPrice = state.orderBumpSelected && suggestedItem ? getEffectiveProductPrice(suggestedItem) : 0;
     const totalUnit = basePrice + addonTotal;
     const priceEl = document.getElementById('add-btn-price');
-    if (priceEl) priceEl.innerText = `R$ ${((totalUnit * state.currentQty) + bumpPrice).toFixed(2)}`;
+    const addButton = document.getElementById('add-to-cart-btn');
+    if (priceEl) priceEl.innerText = needsSelection ? '' : `R$ ${((totalUnit * state.currentQty) + bumpPrice).toFixed(2)}`;
+    if (addButton) {
+        addButton.disabled = needsSelection;
+        addButton.title = needsSelection ? 'Escolha uma opção para continuar.' : '';
+    }
 
     const qtyEl = document.getElementById('detail-qty');
     if (qtyEl) qtyEl.innerText = state.currentQty;
