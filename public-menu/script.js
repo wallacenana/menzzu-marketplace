@@ -211,7 +211,11 @@ function getDisplayPriceText(product) {
             .map(variation => getVariationPrice(variation))
             .filter(price => Number.isFinite(price) && price > 0);
         const fromPrice = effectiveVariationPrices.length > 0 ? Math.min(...effectiveVariationPrices) : basePrice;
-        return fromPrice > 0 ? `A partir de ${formatDisplayPrice(fromPrice)}` : 'Preço não informado';
+        const hasDifferentVariationPrices = effectiveVariationPrices.some(price => Math.abs(price - fromPrice) >= 0.005);
+        if (fromPrice <= 0) return 'Preço não informado';
+        return hasDifferentVariationPrices
+            ? `A partir de ${formatDisplayPrice(fromPrice)}`
+            : formatDisplayPrice(fromPrice);
     }
 
     if (hasPaidAddonsForProduct(product)) {
