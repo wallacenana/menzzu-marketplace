@@ -65,6 +65,7 @@ let state = {
     currentQty: 1,
     currentVariation: null,
     currentSubItem: null,
+    suggestedSelection: null,
     userInfo: JSON.parse(localStorage.getItem('menzzu_user') || '{"name":"","phone":"","address":""}'),
     publicSettings: {
         googleApiKey: '',
@@ -1529,6 +1530,7 @@ function openItemDetail(productId) {
     state.currentQty = 1;
     state.currentVariation = null;
     state.currentSubItem = null;
+    state.suggestedSelection = null;
 
     const body = document.getElementById('item-detail-body');
 
@@ -1692,14 +1694,31 @@ function openItemDetail(productId) {
         })();
 
         const suggestedItem = getSuggestedProductForItem(item);
+        const suggestedVariations = suggestedItem
+            ? JSON.parse(suggestedItem.variations || '[]').filter(variation => !variation.hidden && hasAvailableVariationStock(suggestedItem, variation))
+            : [];
         const orderBumpHtml = suggestedItem ? `
                 <div class="variation-section addon-group-section order-bump-section">
                     <div class="addon-group-header">
                         <h4>Leve também</h4>
                         <span class="addon-group-badge optional">Sugestão</span>
                     </div>
-                    <div class="suggested-product-list">
-                        ${renderProductCard(suggestedItem)}
+                    <div class="suggested-product-card">
+                        ${parseImages(suggestedItem.image).length > 0 ? `<img src="${getImg(parseImages(suggestedItem.image)[0], 'thumb')}" alt="${suggestedItem.name}">` : ''}
+                        <div>
+                            <strong>${suggestedItem.name}</strong>
+                            <span>${suggestedItem.description || 'Escolha uma opção para adicionar.'}</span>
+                        </div>
+                    </div>
+                    <div class="suggested-options">
+                        ${(suggestedVariations.length > 0 ? suggestedVariations : [null]).map(variation => {
+                            const variationName = variation?.name || '';
+                            const price = variation ? getVariationPrice(variation) : getEffectiveProductPrice(suggestedItem);
+                            const isSelected = state.suggestedSelection?.productId === suggestedItem.id
+                                && state.suggestedSelection?.variation === variationName;
+                            const label = variationName || 'Adicionar item';
+                            return `<button type="button" class="var-option ${isSelected ? 'selected' : ''}" onclick="selectSuggestedItem('${suggestedItem.id}', '${variationName.replace(/'/g, "\\'")}', ${price})"><span class="var-label">${label}</span><span class="var-price">${formatDisplayPrice(price)}</span></button>`;
+                        }).join('')}
                     </div>
                 </div>
             ` : '';
@@ -2068,10 +2087,11 @@ function updateDetailFooter() {
     const {
         addonTotal
     } = getSelectedAddons();
+    const suggestedPrice = Number(state.suggestedSelection?.price || 0);
     const totalUnit = basePrice + addonTotal;
     const priceEl = document.getElementById('add-btn-price');
     const addButton = document.getElementById('add-to-cart-btn');
-    if (priceEl) priceEl.innerText = needsSelection ? '' : `R$ ${(totalUnit * state.currentQty).toFixed(2)}`;
+    if (priceEl) priceEl.innerText = needsSelection ? '' : `R$ ${((totalUnit * state.currentQty) + suggestedPrice).toFixed(2)}`;
     if (addButton) {
         addButton.disabled = needsSelection;
         addButton.title = needsSelection ? 'Escolha uma opção para continuar.' : '';
@@ -2079,6 +2099,19 @@ function updateDetailFooter() {
 
     const qtyEl = document.getElementById('detail-qty');
     if (qtyEl) qtyEl.innerText = state.currentQty;
+}
+
+function selectSuggestedItem(productId, variationName, price) {
+    const current = state.suggestedSelection;
+    if (current?.productId === productId && current?.variation === variationName) {
+        state.suggestedSelection = null;
+    } else {
+        state.suggestedSelection = { productId, variation: variationName, price: Number(price) || 0 };
+    }
+    document.querySelectorAll('.suggested-options .var-option').forEach(option => {
+        option.classList.toggle('selected', option.querySelector('.var-label')?.textContent === (state.suggestedSelection?.variation || 'Adicionar item'));
+    });
+    updateDetailFooter();
 }
 
 function validateCurrentItemSelections() {
@@ -3084,6 +3117,28 @@ function commitAddToCart() {
         customFieldValues: customAnswersJSON,
         addons: addonsJSON
     });
+    const suggestedSelection = state.suggestedSelection;
+    const suggestedItem = suggestedSelection ? state.products.find(product => String(product.id) === String(suggestedSelection.productId)) : null;
+    if (suggestedItem) {
+        const suggestedKey = `${suggestedItem.id}-${suggestedSelection.variation || 'item'}`;
+        const existingSuggested = cart.find(cartItem => cartItem.itemKey === suggestedKey);
+        if (existingSuggested) {
+            existingSuggested.quantity += 1;
+        } else {
+            cart.push({
+                productId: suggestedItem.id,
+                itemKey: suggestedKey,
+                name: suggestedItem.name,
+                variation: suggestedSelection.variation || null,
+                subItem: null,
+                price: suggestedSelection.price,
+                quantity: 1,
+                customFieldSchema: null,
+                customFieldValues: null,
+                addons: null
+            });
+        }
+    }
     setActiveCart(cart);
 
     // Tracking: AddToCart

@@ -1370,8 +1370,38 @@ body.theme-dark .var-option.selected {
     transform: rotate(45deg) scale(1);
 }
 
-.suggested-product-list .product-card {
-    margin: 0;
+.suggested-product-card {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.suggested-product-card img {
+    width: 58px;
+    height: 58px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.suggested-product-card > div {
+    display: grid;
+    gap: 3px;
+}
+
+.suggested-product-card strong {
+    color: var(--text-main);
+}
+
+.suggested-product-card span {
+    color: var(--text-gray);
+    font-size: 0.78rem;
+}
+
+.suggested-options .var-option {
+    width: 100%;
+    font: inherit;
+    text-align: left;
 }
 
 /* Sticky Modal Footer */
