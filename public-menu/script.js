@@ -1229,7 +1229,8 @@ function renderMenu() {
 
     // Separar destaques (apenas se não houver busca ativa)
     const featured = query ? [] : filtered.filter(p => p.featured).sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-    const nonFeatured = query ? filtered : filtered.filter(p => !p.featured);
+    // Destaque e vitrine adicional: o produto tambem permanece na categoria.
+    const catalogItems = filtered;
 
     const grouped = {};
     const sortedCategories = [];
@@ -1237,7 +1238,7 @@ function renderMenu() {
         String(category.name || ''),
         Number.isFinite(Number(category.order)) ? Number(category.order) : Number.MAX_SAFE_INTEGER
     ]));
-    nonFeatured.forEach(p => {
+    catalogItems.forEach(p => {
         let cat = 'Geral';
         if (p.categoryId && state.categories && state.categories.length > 0) {
             const foundCat = state.categories.find(c => String(c.id) === String(p.categoryId));
