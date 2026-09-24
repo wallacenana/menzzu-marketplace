@@ -884,28 +884,30 @@ try {
                 </div>
 
                 <div class="modal-scroll-body">
-                    <!-- Step 1: Cart -->
+                    <!-- Step 1: Customer details -->
                     <div class="checkout-step" id="step-1">
-                        <div id="checkout-items-list" class="checkout-items"></div>
-                        <div style="margin-top:20px; border-top:1px solid #eee; padding-top:20px;">
-                            <div class="form-group">
-                                <label class="field-label">Seu Nome</label>
-                                <input type="text" id="user-name" class="ifood-input" placeholder="Nome completo">
-                            </div>
-                            <div class="form-group">
-                                <label class="field-label">WhatsApp</label>
-                                <input type="tel" id="user-phone" class="ifood-input" placeholder="(00) 00000-0000">
-                            </div>
+                        <div class="form-group">
+                            <label class="field-label">Seu Nome</label>
+                            <input type="text" id="user-name" class="ifood-input" placeholder="Nome completo">
+                        </div>
+                        <div class="form-group">
+                            <label class="field-label">WhatsApp</label>
+                            <input type="tel" id="user-phone" class="ifood-input" placeholder="(00) 00000-0000">
                         </div>
                     </div>
 
-                    <!-- Step 2: Order extras -->
+                    <!-- Step 2: Cart -->
                     <div class="checkout-step hidden" id="step-2">
+                        <div id="checkout-items-list" class="checkout-items"></div>
+                    </div>
+
+                    <!-- Step 3: Order extras -->
+                    <div class="checkout-step hidden" id="step-3">
                         <div id="order-extra-step-content"></div>
                     </div>
 
-                    <!-- Step 3: Delivery or pickup details -->
-                    <div class="checkout-step hidden" id="step-3">
+                    <!-- Step 4: Delivery or pickup details -->
+                    <div class="checkout-step hidden" id="step-4">
                         <!-- Toggle Delivery/Pickup -->
                         <div id="checkout-type-tabs" class="checkout-type-tabs">
                             <button type="button" class="ifood-btn type-tab active" data-method="delivery" onclick="setDeliveryType('delivery')">Entrega</button>
@@ -960,15 +962,15 @@ try {
 
                     </div>
 
-                    <!-- Step 4: Payment Method -->
-                    <div class="checkout-step hidden" id="step-4">
+                    <!-- Step 5: Payment Method -->
+                    <div class="checkout-step hidden" id="step-5">
                         <h3 style="font-size:1rem; font-weight:700; margin-bottom:18px; color:var(--text-main);">Forma de
                             Pagamento</h3>
                         <div id="payment-options" style="display:flex; flex-direction:column; gap:12px;"></div>
                     </div>
 
-                    <!-- Step 5: Summary -->
-                    <div class="checkout-step hidden" id="step-5">
+                    <!-- Step 6: Summary -->
+                    <div class="checkout-step hidden" id="step-6">
                         <div id="order-summary-content">
                             <div class="summary-section">
                                 <h3 class="field-label" style="font-size: 1.1rem; margin-bottom: 12px;">Resumo dos Itens

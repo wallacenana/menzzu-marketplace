@@ -417,9 +417,6 @@ function formatOrderSchedule() {
 
 function openScheduleModal(context = 'add') {
     state.scheduleModalContext = context;
-    if (context !== 'add') {
-        state.currentStep = 1;
-    }
     const modal = document.getElementById('order-schedule-modal');
     if (!modal) return;
     const dateInput = document.getElementById('schedule-date');
@@ -478,10 +475,10 @@ async function commitScheduleAndMaybeAdd() {
     closeWithAnimation('order-schedule-modal');
     if (state.scheduleModalContext === 'add') {
         commitAddToCart();
-    } else if (state.currentStep === 1 && state.activeTab === 'order') {
-        goToStep(hasCheckoutExtras() ? 2 : 3);
+    } else if (state.currentStep === 2 && state.activeTab === 'order') {
+        goToStep(hasCheckoutExtras() ? 3 : 4);
     } else if (state.currentStep >= 2 && state.activeTab === 'order') {
-        renderStep2();
+        renderReceivingStep();
     }
 }
 
@@ -2468,10 +2465,6 @@ function initEventListeners() {
 
     bindClick('view-cart-btn', () => {
         restoreCheckoutState();
-        if (state.activeTab === 'order' && (!state.orderSchedule?.date || !state.orderSchedule?.time) && getActiveCart().length > 0) {
-            openScheduleModal('resume');
-            return;
-        }
         goToStep(getResumeStep());
     });
     bindClick('next-step-btn', handleNextStep);
@@ -2554,11 +2547,11 @@ function initEventListeners() {
 }
 
 function goToStep(step) {
-    if (step === 2 && state.activeTab === 'delivery') {
-        step = 3;
+    if (step === 3 && state.activeTab === 'delivery') {
+        step = 4;
     }
-    if (step === 2 && state.activeTab === 'order' && !hasCheckoutExtras()) {
-        step = 3;
+    if (step === 3 && state.activeTab === 'order' && !hasCheckoutExtras()) {
+        step = 4;
     }
 
     state.currentStep = step;
@@ -2571,27 +2564,33 @@ function goToStep(step) {
     document.getElementById('step-2')?.classList.add('hidden');
     document.getElementById('step-3')?.classList.add('hidden');
     document.getElementById('step-4')?.classList.add('hidden');
+    document.getElementById('step-5')?.classList.add('hidden');
+    document.getElementById('step-6')?.classList.add('hidden');
 
     // Mostra apenas o atual
     document.getElementById(`step-${step}`)?.classList.remove('hidden');
 
     openModal('checkout-modal');
 
-    let title = "Ver sacola";
-    if (step === 2) title = "Extras do Pedido";
-    if (step === 3) title = "Forma de Pagamento";
-    if (step === 4) title = "Confirmar Pedido";
+    let title = "Seus dados";
+    if (step === 2) title = "Sua sacola";
+    if (step === 3) title = "Extras do Pedido";
+    if (step === 4) title = "Recebimento";
+    if (step === 5) title = "Forma de Pagamento";
+    if (step === 6) title = "Confirmar Pedido";
 
     document.getElementById('checkout-step-title').innerText = title;
 
-    const isLast = step === 4;
+    const isLast = step === 6;
     document.getElementById('next-step-btn').classList.toggle('hidden', isLast);
     document.getElementById('place-order-btn').classList.toggle('hidden', !isLast);
 
-    if (step === 1) renderStep1();
-    if (step === 2) renderStep2();
-    if (step === 3) renderStep3();
-    if (step === 4) {
+    if (step === 1) renderCustomerStep();
+    if (step === 2) renderCartStep();
+    if (step === 3) renderCheckoutExtraStep();
+    if (step === 4) renderReceivingStep();
+    if (step === 5) renderPaymentStep();
+    if (step === 6) {
         updateStep4Summary();
     }
 }
@@ -2643,51 +2642,30 @@ function restoreCheckoutState() {
     }
 }
 
-// Returns the step the user should land on when reopening the cart:
-// the first step with missing data, or the previously saved step if everything is filled.
+// Customer details can be skipped once saved, but the cart is always reviewed.
 function getResumeStep() {
     if (getActiveCart().length === 0) return 1;
-
-    let saved;
-    try {
-        saved = JSON.parse(localStorage.getItem('menzzu_checkout') || 'null');
-    } catch (e) {
-        saved = null;
-    }
-    // Saved step only counts if the user is on the same tab they were checking out from
-    const sameTab = saved && saved.activeTab === state.activeTab;
-    const savedStep = sameTab && saved.step ? parseInt(saved.step) : 1;
-
-    // Step 2 requires name + valid phone (from step 1 form)
     const phone = state.userInfo.phone || '';
     if (!state.userInfo.name || !phone || phone.length < 14) return 1;
-
-    // Step 3 requires step 2 data: address + delivery fee for delivery; schedule + extras for order
-    if (state.activeTab === 'delivery') {
-        if (state.deliveryType === 'delivery') {
-            if (!state.userInfo.address) return 3;
-            if (!state.deliveryFee) return 3;
-        }
-    } else {
-        if (!state.orderSchedule?.date || !state.orderSchedule?.time) return 1;
-        if (hasCheckoutExtras() && savedStep < 3) return 2;
-    }
-
-    // Step 4 requires payment method (defaults to 'mercadopago', but guard anyway)
-    if (!state.paymentMethod) return 3;
-
-    // All data present: respect where the user actually was, capped between 1 and 4
-    return Math.max(1, Math.min(4, savedStep));
+    return 2;
 }
 
 document.getElementById('checkout-back-btn')?.addEventListener('click', () => {
     if (state.currentStep > 1) {
-        const previousStep = ((state.activeTab === 'order' && !hasCheckoutExtras()) || (state.activeTab === 'delivery' && state.currentStep === 3)) ? 1 : state.currentStep - 1;
+        const previousStep = state.currentStep === 4 && (state.activeTab === 'delivery' || !hasCheckoutExtras())
+            ? 2
+            : state.currentStep - 1;
         goToStep(previousStep);
     } else closeWithAnimation('checkout-modal');
 });
 
-function renderStep1() {
+function renderCustomerStep() {
+    document.getElementById('user-name').value = state.userInfo.name || '';
+    document.getElementById('user-phone').value = state.userInfo.phone || '';
+    document.getElementById('next-step-btn').disabled = false;
+}
+
+function renderCartStep() {
     const cart = getActiveCart();
     const list = document.getElementById('checkout-items-list');
     if (cart.length === 0) {
@@ -2734,7 +2712,7 @@ function updateCartQty(itemKey, delta) {
     }
 
     setActiveCart(cart);
-    renderStep1();
+    renderCartStep();
     updateUI();
 }
 
@@ -2750,7 +2728,7 @@ function selectPaymentMethod(method) {
     });
 }
 
-function renderStep3() {
+function renderPaymentStep() {
     const opts = document.getElementById('payment-options');
     if (!opts) return;
 
@@ -2819,7 +2797,7 @@ function renderStep3() {
     selectPaymentMethod(state.paymentMethod);
 }
 
-function renderStep2() {
+function renderReceivingStep() {
     const isDelivery = state.activeTab === 'delivery';
     const enabledMethods = getEnabledFulfillmentMethods();
 
@@ -2954,36 +2932,36 @@ async function handleNextStep() {
                 'Estamos fechados para pronta entrega no momento. Por favor, utilize a aba de Encomendas para agendar seu pedido.' :
                 'Estamos fechados para pronta entrega no momento.');
         }
+        goToStep(2);
+    } else if (state.currentStep === 2) {
+        if (getActiveCart().length === 0) return showAlert('Sacola vazia', 'Adicione pelo menos um item para continuar.');
         if (state.activeTab === 'order') {
             if (!state.orderSchedule?.date || !state.orderSchedule?.time) {
                 openScheduleModal('resume');
                 return;
             }
-            goToStep(hasCheckoutExtras() ? 2 : 3);
+            goToStep(hasCheckoutExtras() ? 3 : 4);
             return;
         }
-        goToStep(3);
-    } else if (state.currentStep === 2) {
+        goToStep(4);
+    } else if (state.currentStep === 3) {
+        if (!isOrderEnabled()) return showAlert('Encomendas desativadas', 'No momento não estamos aceitando encomendas.');
+        const extrasResult = collectCheckoutExtraStep();
+        if (!extrasResult.ok) {
+            return showAlert('Atenção', extrasResult.message || 'Preencha os campos extras antes de continuar.');
+        }
+        goToStep(4);
+    } else if (state.currentStep === 4) {
         if (state.activeTab === 'delivery') {
             if (state.deliveryType === 'delivery' && !state.userInfo.address) return showAlert('Endereço Ausente', 'Por favor, selecione seu endereço no mapa.');
             if (state.deliveryFee === 0 && state.deliveryType === 'delivery' && state.userInfo.address) {
                 return showAlert('Taxa Indisponível', 'Por favor, aguarde o cálculo da taxa de entrega ou verifique se o endereço está no raio de entrega.');
             }
-        } else if (state.activeTab === 'order') {
-            if (!isOrderEnabled()) return showAlert('Encomendas desativadas', 'No momento não estamos aceitando encomendas.');
-            if (hasCheckoutExtras()) {
-                const extrasResult = collectCheckoutExtraStep();
-                if (!extrasResult.ok) {
-                    return showAlert('Atenção', extrasResult.message || 'Preencha os campos extras antes de continuar.');
-                }
-            }
-            goToStep(3);
-            return;
         }
-        goToStep(3);
-    } else if (state.currentStep === 3) {
+        goToStep(5);
+    } else if (state.currentStep === 5) {
         if (!state.paymentMethod) return showAlert('Atenção', 'Selecione uma forma de pagamento.');
-        goToStep(4);
+        goToStep(6);
     }
 }
 
@@ -3564,7 +3542,7 @@ function reorderItem(orderId) {
         } : null;
         addToCart();
         closeWithAnimation('history-modal');
-        goToStep(1);
+        goToStep(getResumeStep());
     } else {
         showAlert('Produto Indisponível', 'Este produto não está mais disponível no cardápio no momento.', 'error');
     }
