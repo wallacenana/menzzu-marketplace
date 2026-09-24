@@ -1626,10 +1626,8 @@ function openItemDetail(productId) {
             ? `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map((v, index) => {
                 const price = variationPrices[index];
                 const available = hasAvailableVariationStock(item, v);
-                const priceLabel = hasDifferentVariationPrices && price > 0
-                    ? (Math.abs(price - minimumVariationPrice) < 0.005
-                        ? formatDisplayPrice(price)
-                        : formatPriceDifference(price, minimumVariationPrice))
+                const priceLabel = hasDifferentVariationPrices && price > minimumVariationPrice + 0.005
+                    ? formatPriceDifference(price, minimumVariationPrice)
                     : '';
                 return `<div class="var-option ${available ? '' : 'disabled'}" ${available ? `onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getVariationPrice(v)})"` : 'aria-disabled="true"'}><div class="var-label">${v.name}</div><div class="var-price">${available ? priceLabel : 'Esgotado'}</div></div>`;
             }).join('')}</div>`
