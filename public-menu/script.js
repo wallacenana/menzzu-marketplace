@@ -65,7 +65,6 @@ let state = {
     currentQty: 1,
     currentVariation: null,
     currentSubItem: null,
-    orderBumpSelected: false,
     userInfo: JSON.parse(localStorage.getItem('menzzu_user') || '{"name":"","phone":"","address":""}'),
     publicSettings: {
         googleApiKey: '',
@@ -1530,7 +1529,6 @@ function openItemDetail(productId) {
     state.currentQty = 1;
     state.currentVariation = null;
     state.currentSubItem = null;
-    state.orderBumpSelected = false;
 
     const body = document.getElementById('item-detail-body');
 
@@ -1694,25 +1692,15 @@ function openItemDetail(productId) {
         })();
 
         const suggestedItem = getSuggestedProductForItem(item);
-        const suggestedItemImages = suggestedItem ? parseImages(suggestedItem.image) : [];
         const orderBumpHtml = suggestedItem ? `
                 <div class="variation-section addon-group-section order-bump-section">
                     <div class="addon-group-header">
                         <h4>Leve também</h4>
                         <span class="addon-group-badge optional">Sugestão</span>
                     </div>
-                    <label class="var-option addon-option order-bump-option ${state.orderBumpSelected ? 'selected' : ''}" onclick="toggleOrderBumpSelect(event)">
-                        ${suggestedItemImages.length > 0 ? `<img class="order-bump-image" src="${getImg(suggestedItemImages[0], 'thumb')}" alt="${suggestedItem.name}">` : ''}
-                        <div class="order-bump-copy">
-                            <span class="var-label">${suggestedItem.name}</span>
-                            <span class="order-bump-description">${suggestedItem.description || 'Sugestão para complementar o pedido.'}</span>
-                        </div>
-                        <div class="addon-option-meta">
-                            <span class="var-price addon-option-price">${getDisplayPriceText(suggestedItem)}</span>
-                            <span class="addon-option-mark" aria-hidden="true"></span>
-                        </div>
-                        <input type="checkbox" id="order-bump-input" class="addon-input" ${state.orderBumpSelected ? 'checked' : ''}>
-                    </label>
+                    <div class="suggested-product-list">
+                        ${renderProductCard(suggestedItem)}
+                    </div>
                 </div>
             ` : '';
 
@@ -2080,12 +2068,10 @@ function updateDetailFooter() {
     const {
         addonTotal
     } = getSelectedAddons();
-    const suggestedItem = getSuggestedProductForItem(state.currentItem);
-    const bumpPrice = state.orderBumpSelected && suggestedItem ? getEffectiveProductPrice(suggestedItem) : 0;
     const totalUnit = basePrice + addonTotal;
     const priceEl = document.getElementById('add-btn-price');
     const addButton = document.getElementById('add-to-cart-btn');
-    if (priceEl) priceEl.innerText = needsSelection ? '' : `R$ ${((totalUnit * state.currentQty) + bumpPrice).toFixed(2)}`;
+    if (priceEl) priceEl.innerText = needsSelection ? '' : `R$ ${(totalUnit * state.currentQty).toFixed(2)}`;
     if (addButton) {
         addButton.disabled = needsSelection;
         addButton.title = needsSelection ? 'Escolha uma opção para continuar.' : '';
@@ -2093,19 +2079,6 @@ function updateDetailFooter() {
 
     const qtyEl = document.getElementById('detail-qty');
     if (qtyEl) qtyEl.innerText = state.currentQty;
-}
-
-function toggleOrderBumpSelect(event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    state.orderBumpSelected = !state.orderBumpSelected;
-    const input = document.getElementById('order-bump-input');
-    if (input) input.checked = state.orderBumpSelected;
-    const label = input?.closest('label');
-    if (label) label.classList.toggle('selected', state.orderBumpSelected);
-    updateDetailFooter();
 }
 
 function validateCurrentItemSelections() {
@@ -3112,30 +3085,6 @@ function commitAddToCart() {
         addons: addonsJSON
     });
     setActiveCart(cart);
-
-    const suggestedItem = state.orderBumpSelected ? getSuggestedProductForItem(item) : null;
-    if (suggestedItem) {
-        const bumpKey = `${item.id}--bump--${suggestedItem.id}`;
-        const bumpPrice = getEffectiveProductPrice(suggestedItem);
-        const existingBump = cart.find(c => c.itemKey === bumpKey);
-        if (existingBump) {
-            existingBump.quantity += 1;
-        } else {
-            cart.push({
-                productId: suggestedItem.id,
-                itemKey: bumpKey,
-                name: suggestedItem.name,
-                variation: null,
-                price: bumpPrice,
-                quantity: 1,
-                customFieldSchema: null,
-                customFieldValues: null,
-                addons: null,
-                isOrderBump: true
-            });
-        }
-        setActiveCart(cart);
-    }
 
     // Tracking: AddToCart
     const finalPrice = finalUnitPrice;

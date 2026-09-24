@@ -1370,6 +1370,10 @@ body.theme-dark .var-option.selected {
     transform: rotate(45deg) scale(1);
 }
 
+.suggested-product-list .product-card {
+    margin: 0;
+}
+
 /* Sticky Modal Footer */
 .modal-footer-sticky {
     padding: 16px;
