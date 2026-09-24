@@ -1950,6 +1950,7 @@ function selectVariation(name, price, renderOptions = true) {
     const variations = JSON.parse(state.currentItem?.variations || '[]');
     const selected = variations.find(variation => String(variation.name) === String(name));
     state.currentVariation = {
+        ...(selected || {}),
         name,
         price,
         subItems: Array.isArray(selected?.subItems) ? selected.subItems : []
