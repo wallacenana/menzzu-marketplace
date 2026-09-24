@@ -165,6 +165,12 @@ function formatDisplayPrice(price, prefix = 'R$') {
     return price > 0 ? `${prefix} ${price.toFixed(2).replace('.', ',')}` : 'Preço não informado';
 }
 
+function formatPriceDifference(price, referencePrice) {
+    const difference = Number(price || 0) - Number(referencePrice || 0);
+    if (Math.abs(difference) < 0.005) return '';
+    return `${difference > 0 ? '+' : '-'} ${formatDisplayPrice(Math.abs(difference))}`;
+}
+
 function hasPaidAddonsForProduct(product) {
     try {
         const groupIds = JSON.parse(product?.addonGroups || '[]');
@@ -1567,10 +1573,17 @@ function openItemDetail(productId) {
                     `;
 
         const variationPrices = variations.map(variation => getVariationPrice(variation, item));
+        const minimumVariationPrice = variationPrices
+            .filter(price => Number.isFinite(price) && price > 0)
+            .reduce((minimum, price) => Math.min(minimum, price), Infinity);
         const variationsHtml = variations.length > 0
             ? `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map((v, index) => {
                 const price = variationPrices[index];
-                const priceLabel = price > 0 ? formatDisplayPrice(price) : '';
+                const priceLabel = price > 0
+                    ? (Math.abs(price - minimumVariationPrice) < 0.005
+                        ? formatDisplayPrice(price)
+                        : formatPriceDifference(price, minimumVariationPrice))
+                    : '';
                 return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getResolvedProductPrice(v, item)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`;
             }).join('')}</div>`
             : '';
@@ -1818,8 +1831,9 @@ function renderVariationAccordion() {
                 option.innerHTML = '<div class="var-label"></div><div class="var-price"></div>';
                 option.querySelector('.var-label').textContent = subItem.name || 'Opção';
                 const price = getResolvedProductPrice(subItem, variation, state.currentItem);
+                const variationPrice = getVariationPrice(variation, state.currentItem);
                 option.querySelector('.var-price').textContent = price > 0
-                    ? formatDisplayPrice(price)
+                    ? formatPriceDifference(price, variationPrice)
                     : '';
                 option.querySelector('.var-label').style.cssText = 'min-width: 0; flex: 1 1 auto;';
                 option.querySelector('.var-price').style.cssText = 'margin-left: auto; flex: 0 0 auto; white-space: nowrap;';
