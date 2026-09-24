@@ -149,6 +149,27 @@ function getResolvedProductPrice(product, ...fallbackProducts) {
     return 0;
 }
 
+function isStockTrackingEnabled(product) {
+    return product?.trackStock === true || product?.trackStock === 1 || product?.trackStock === 'true';
+}
+
+function hasAvailableVariationStock(product, variation) {
+    if (!isStockTrackingEnabled(product)) return true;
+    const subItems = (Array.isArray(variation?.subItems) ? variation.subItems : []).filter(item => !item?.hidden);
+    return subItems.length > 0
+        ? subItems.some(item => Number(item?.stock) > 0)
+        : Number(variation?.stock) > 0;
+}
+
+function hasAvailableProductStock(product, variations = null) {
+    if (!isStockTrackingEnabled(product)) return true;
+    const availableVariations = variations || JSON.parse(product?.variations || '[]').filter(variation => !variation?.hidden);
+    if (availableVariations.length > 0) {
+        return availableVariations.some(variation => hasAvailableVariationStock(product, variation));
+    }
+    return Number(product?.stock) > 0;
+}
+
 function getVariationPrice(variation) {
     const directPrice = getEffectiveProductPrice(variation);
     if (directPrice > 0 && !(Array.isArray(variation?.subItems) && variation.subItems.length > 0)) return directPrice;
@@ -1235,8 +1256,11 @@ function renderMenu() {
         // Verificar se tem variações e se todas estão escondidas
         const variations = JSON.parse(p.variations || '[]');
         if (variations.length > 0) {
-            const hasVisibleVar = variations.some(v => !v.hidden);
-            if (!hasVisibleVar) return false;
+            const visibleVariations = variations.filter(v => !v.hidden);
+            if (visibleVariations.length === 0) return false;
+            if (!hasAvailableProductStock(p, visibleVariations)) return false;
+        } else if (!hasAvailableProductStock(p, [])) {
+            return false;
         }
 
         const matchesSearch = p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
@@ -1604,12 +1628,13 @@ function openItemDetail(productId) {
         const variationsHtml = variations.length > 0
             ? `<div class="variation-section"><div class="addon-group-header"><h4>Escolha uma opção</h4></div>${variations.map((v, index) => {
                 const price = variationPrices[index];
+                const available = hasAvailableVariationStock(item, v);
                 const priceLabel = hasDifferentVariationPrices && price > 0
                     ? (Math.abs(price - minimumVariationPrice) < 0.005
                         ? formatDisplayPrice(price)
                         : formatPriceDifference(price, minimumVariationPrice))
                     : '';
-                return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getVariationPrice(v)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`;
+                return `<div class="var-option ${available ? '' : 'disabled'}" ${available ? `onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getVariationPrice(v)})"` : 'aria-disabled="true"'}><div class="var-label">${v.name}</div><div class="var-price">${available ? priceLabel : 'Esgotado'}</div></div>`;
             }).join('')}</div>`
             : '';
 
@@ -1822,6 +1847,12 @@ function renderVariationAccordion() {
     rows.forEach((row, index) => {
         const variation = variations[index];
         if (!variation) return;
+        if (!hasAvailableVariationStock(state.currentItem, variation)) {
+            row.classList.add('disabled');
+            row.removeAttribute('onclick');
+            row.setAttribute('aria-disabled', 'true');
+            return;
+        }
 
         const variationSubItems = Array.isArray(variation.subItems) ? variation.subItems : [];
         if (variationSubItems.length === 0) return;
@@ -3032,6 +3063,9 @@ function commitAddToCart() {
     const variation = state.currentVariation;
     const variations = JSON.parse(item.variations || '[]').filter(v => !v.hidden);
     if (variations.length > 0 && !variation) return showAlert('Quase lá...', 'Por favor, selecione uma opção para continuar.');
+    if (!hasAvailableProductStock(item, variations) || (variation && !hasAvailableVariationStock(item, variation))) {
+        return showAlert('Item indisponível', 'Esta opção está sem estoque no momento.');
+    }
 
     // Coleta custom fields (texto/imagem)
     let customAnswers = {};

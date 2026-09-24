@@ -1090,6 +1090,18 @@ h3 {
     background: color-mix(in srgb, var(--primary-color) 4%, var(--surface-color));
 }
 
+.var-option.disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+    background: #fafafa;
+    border-color: #ece9e8;
+}
+
+.var-option.disabled .var-label,
+.var-option.disabled .var-price {
+    color: #a8a29e;
+}
+
 body.theme-dark .var-option.selected {
     background: color-mix(in srgb, var(--primary-color) 10%, var(--surface-color));
 }
