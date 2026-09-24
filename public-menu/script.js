@@ -149,13 +149,13 @@ function getResolvedProductPrice(product, ...fallbackProducts) {
     return 0;
 }
 
-function getVariationPrice(variation, product = null) {
-    const directPrice = getResolvedProductPrice(variation, product);
+function getVariationPrice(variation) {
+    const directPrice = getEffectiveProductPrice(variation);
     if (directPrice > 0 && !(Array.isArray(variation?.subItems) && variation.subItems.length > 0)) return directPrice;
 
     const subItemPrices = (Array.isArray(variation?.subItems) ? variation.subItems : [])
         .filter(subItem => !subItem?.hidden)
-        .map(subItem => getResolvedProductPrice(subItem, variation, product))
+        .map(subItem => getResolvedProductPrice(subItem, variation))
         .filter(price => Number.isFinite(price) && price > 0);
 
     return subItemPrices.length > 0 ? Math.min(...subItemPrices) : 0;
@@ -169,6 +169,23 @@ function formatPriceDifference(price, referencePrice) {
     const difference = Number(price || 0) - Number(referencePrice || 0);
     if (Math.abs(difference) < 0.005) return '';
     return `${difference > 0 ? '+' : '-'} ${formatDisplayPrice(Math.abs(difference))}`;
+}
+
+function getSelectedItemPrice(item = state.currentItem) {
+    const variation = state.currentVariation;
+    if (!variation) {
+        const variations = JSON.parse(item?.variations || '[]').filter(candidate => !candidate.hidden);
+        if (variations.length > 0) {
+            const prices = variations.map(candidate => getVariationPrice(candidate)).filter(price => price > 0);
+            return prices.length > 0 ? Math.min(...prices) : 0;
+        }
+        return getEffectiveProductPrice(item);
+    }
+
+    if (state.currentSubItem) {
+        return getResolvedProductPrice(state.currentSubItem, variation);
+    }
+    return getVariationPrice(variation);
 }
 
 function hasPaidAddonsForProduct(product) {
@@ -191,7 +208,7 @@ function getDisplayPriceText(product) {
 
     if (variations.length > 0) {
         const effectiveVariationPrices = variations
-            .map(variation => getVariationPrice(variation, product))
+            .map(variation => getVariationPrice(variation))
             .filter(price => Number.isFinite(price) && price > 0);
         const fromPrice = effectiveVariationPrices.length > 0 ? Math.min(...effectiveVariationPrices) : basePrice;
         return fromPrice > 0 ? `A partir de ${formatDisplayPrice(fromPrice)}` : 'Preço não informado';
@@ -1573,7 +1590,7 @@ function openItemDetail(productId) {
                         </div>
                     `;
 
-        const variationPrices = variations.map(variation => getVariationPrice(variation, item));
+        const variationPrices = variations.map(variation => getVariationPrice(variation));
         const minimumVariationPrice = variationPrices
             .filter(price => Number.isFinite(price) && price > 0)
             .reduce((minimum, price) => Math.min(minimum, price), Infinity);
@@ -1585,7 +1602,7 @@ function openItemDetail(productId) {
                         ? formatDisplayPrice(price)
                         : formatPriceDifference(price, minimumVariationPrice))
                     : '';
-                return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getResolvedProductPrice(v, item)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`;
+                return `<div class="var-option" onclick="selectVariation('${v.name.replace(/'/g, "\\'")}', ${getVariationPrice(v)})"><div class="var-label">${v.name}</div><div class="var-price">${priceLabel}</div></div>`;
             }).join('')}</div>`
             : '';
 
@@ -1831,8 +1848,8 @@ function renderVariationAccordion() {
                 option.style.boxSizing = 'border-box';
                 option.innerHTML = '<div class="var-label"></div><div class="var-price"></div>';
                 option.querySelector('.var-label').textContent = subItem.name || 'Opção';
-                const price = getResolvedProductPrice(subItem, variation, state.currentItem);
-                const variationPrice = getVariationPrice(variation, state.currentItem);
+                const price = getResolvedProductPrice(subItem, variation);
+                const variationPrice = getVariationPrice(variation);
                 option.querySelector('.var-price').textContent = price > 0
                     ? formatPriceDifference(price, variationPrice)
                     : '';
@@ -2021,9 +2038,7 @@ function getOrderAddonsJSON(item) {
 }
 
 function updateDetailFooter() {
-    const basePrice = state.currentVariation
-        ? getResolvedProductPrice(state.currentSubItem, state.currentVariation, state.currentItem)
-        : getEffectiveProductPrice(state.currentItem);
+    const basePrice = getSelectedItemPrice();
     const {
         addonTotal
     } = getSelectedAddons();
@@ -3039,9 +3054,7 @@ function commitAddToCart() {
         addons,
         addonTotal
     } = getSelectedAddons();
-    const basePrice = variation
-        ? getResolvedProductPrice(state.currentSubItem, variation, item)
-        : getEffectiveProductPrice(item);
+    const basePrice = getSelectedItemPrice(item);
     const finalUnitPrice = basePrice + addonTotal;
 
     const customFieldSchema = getCustomFieldSchema(item);
