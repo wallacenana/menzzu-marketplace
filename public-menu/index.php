@@ -1087,6 +1087,17 @@ try {
             </div>
         </div>
 
+        <div id="order-status-modal" class="modal hidden" aria-modal="true" role="dialog" aria-labelledby="order-status-title">
+            <div class="modal-overlay"></div>
+            <div class="modal-content" style="max-width: 520px;">
+                <div class="history-modal-header">
+                    <h3 id="order-status-title">Acompanhar pedido</h3>
+                    <button class="close-modal-btn" type="button" onclick="closeOrderStatusModal()" aria-label="Fechar acompanhamento"><i data-lucide="x"></i></button>
+                </div>
+                <div id="order-status-content" style="padding: 8px 2px 12px;"></div>
+            </div>
+        </div>
+
         <div id="review-modal" class="modal hidden">
             <div class="modal-overlay"></div>
             <div class="modal-content" style="max-width: 520px;">
@@ -1123,6 +1134,7 @@ try {
                 <p>Informe seu endereço para calcular a entrega e mostrar as lojas mais próximas.</p>
                 <form id="restaurant-location-form">
                     <input type="text" id="user-address" class="ifood-input" placeholder="Rua, número, bairro..." autocomplete="off" spellcheck="false">
+                    <input type="text" id="user-address-complement" class="ifood-input" placeholder="Complemento: apto, bloco, casa, ponto de referência..." autocomplete="address-line2" maxlength="160">
                     <div id="restaurant-location-fee" class="restaurant-location-fee" hidden></div>
                     <button type="submit" class="primary-btn" disabled>Salvar endereço</button>
                 </form>
@@ -1202,9 +1214,17 @@ try {
                 const modal = document.getElementById('restaurant-location-modal');
                 const form = document.getElementById('restaurant-location-form');
                 const input = document.getElementById('user-address');
-                if (!modal || !form || !input) return;
+                const complementInput = document.getElementById('user-address-complement');
+                if (!modal || !form || !input || !complementInput) return;
 
                 window.openRestaurantLocationModal = () => {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem('menzzu_home_address') || '{}');
+                        input.value = String(saved.address || saved.formatted_address || input.value || '').trim();
+                        complementInput.value = String(saved.complement || '').trim();
+                    } catch (error) {
+                        // Keep the current field values when saved data is invalid.
+                    }
                     modal.classList.remove('hidden');
                     lockPage();
                     if (submitButton) {
@@ -1214,15 +1234,6 @@ try {
                     input.focus({
                         preventScroll: true
                     });
-                };
-
-                const hasSavedAddress = () => {
-                    try {
-                        const saved = JSON.parse(localStorage.getItem('menzzu_home_address') || '{}');
-                        return Boolean(String(saved.address || saved.formatted_address || '').trim());
-                    } catch (error) {
-                        return false;
-                    }
                 };
 
                 const close = () => {
@@ -1249,6 +1260,7 @@ try {
                     document.body.style.right = '';
                     window.scrollTo(0, scrollY);
                 };
+                modal.querySelector('.restaurant-location-backdrop')?.addEventListener('click', close);
                 input.addEventListener('input', () => {
                     modal.dataset.calculatedAddress = '';
                     if (feeDisplay) {
@@ -1276,6 +1288,7 @@ try {
                 form.addEventListener('submit', (event) => {
                     event.preventDefault();
                     const address = input.value.trim();
+                    const complement = complementInput.value.trim();
                     if (!address) {
                         input.focus();
                         return;
@@ -1296,10 +1309,14 @@ try {
                             ...saved,
                             address,
                             formatted_address: address,
+                            complement,
                             ...selectedCoordinates
                         }));
                         window.dispatchEvent(new CustomEvent('menzzu-address-saved', {
-                            detail: { address, coordinates: selectedCoordinates }
+                            detail: {
+                                address: complement ? `${address}, ${complement}` : address,
+                                coordinates: selectedCoordinates
+                            }
                         }));
                         close();
                         return;
@@ -1315,15 +1332,6 @@ try {
                     }
                 });
 
-                if (!hasSavedAddress()) {
-                    setTimeout(() => {
-                        modal.classList.remove('hidden');
-                        lockPage();
-                        input.focus({
-                            preventScroll: true
-                        });
-                    }, 250);
-                }
             })();
         </script>
 
