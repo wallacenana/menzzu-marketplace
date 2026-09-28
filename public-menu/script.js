@@ -258,7 +258,9 @@ function getSuggestedProductForItem(item) {
     const suggestedId = String(item.suggestedItemId || '');
     if (!suggestedId) return null;
     if (String(item.id || '') === suggestedId) return null;
-    return (state.products || []).find(product => String(product.id) === suggestedId) || null;
+    const suggestedItem = (state.products || []).find(product => String(product.id) === suggestedId);
+    if (!suggestedItem || suggestedItem.active === false || !hasAvailableProductStock(suggestedItem)) return null;
+    return suggestedItem;
 }
 
 function minPositiveNumber(values = []) {
@@ -2113,6 +2115,14 @@ function updateDetailFooter() {
 }
 
 function selectSuggestedItem(productId, variationName, price) {
+    const product = (state.products || []).find(item => String(item.id) === String(productId));
+    const variation = variationName
+        ? JSON.parse(product?.variations || '[]').find(item => String(item?.name || '') === String(variationName))
+        : null;
+    if (!product || product.active === false || !hasAvailableProductStock(product) || (variation && !hasAvailableVariationStock(product, variation))) {
+        state.suggestedSelection = null;
+        return showAlert('Item indisponível', 'Esta sugestão está sem estoque no momento.');
+    }
     const current = state.suggestedSelection;
     if (current?.productId === productId && current?.variation === variationName) {
         state.suggestedSelection = null;
@@ -3136,6 +3146,13 @@ function commitAddToCart() {
     const suggestedSelection = state.suggestedSelection;
     const suggestedItem = suggestedSelection ? state.products.find(product => String(product.id) === String(suggestedSelection.productId)) : null;
     if (suggestedItem) {
+        const suggestedVariation = suggestedSelection.variation
+            ? JSON.parse(suggestedItem.variations || '[]').find(variation => String(variation?.name || '') === String(suggestedSelection.variation))
+            : null;
+        if (suggestedItem.active === false || !hasAvailableProductStock(suggestedItem) || (suggestedVariation && !hasAvailableVariationStock(suggestedItem, suggestedVariation))) {
+            state.suggestedSelection = null;
+            return showAlert('Item indisponível', 'A sugestão ficou sem estoque. Escolha outro item para continuar.');
+        }
         const suggestedKey = `${suggestedItem.id}-${suggestedSelection.variation || 'item'}`;
         const existingSuggested = cart.find(cartItem => cartItem.itemKey === suggestedKey);
         if (existingSuggested) {
