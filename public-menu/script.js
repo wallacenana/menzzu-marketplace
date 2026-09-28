@@ -71,19 +71,19 @@ function productShareSlug(product) {
 
 function setProductUrl(product) {
     const url = new URL(window.location.href);
-    url.searchParams.set('produto', productShareSlug(product));
+    url.searchParams.set('p', productShareSlug(product));
     window.history.replaceState({ productId: product.id }, '', url.toString());
 }
 
 function clearProductUrl() {
     const url = new URL(window.location.href);
-    if (!url.searchParams.has('produto')) return;
-    url.searchParams.delete('produto');
+    if (!url.searchParams.has('p')) return;
+    url.searchParams.delete('p');
     window.history.replaceState({}, '', url.toString());
 }
 
 function getProductFromUrl() {
-    const productSlug = new URLSearchParams(window.location.search).get('produto');
+    const productSlug = new URLSearchParams(window.location.search).get('p');
     if (!productSlug) return null;
     return (state.products || []).find(product => productShareSlug(product) === productSlug) || null;
 }
