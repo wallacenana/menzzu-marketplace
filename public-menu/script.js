@@ -40,6 +40,53 @@ const isHome = (window.location.hostname === BASE_DOMAIN || window.location.host
 const pathSegments = window.location.pathname.split('/').filter(p => p);
 const querySlug = new URLSearchParams(window.location.search).get('loja') || '';
 const STORE_SLUG = window.__STORE_SLUG__ || (isHome ? '' : (querySlug || pathSegments[0] || ''));
+const ACTIVE_TAB_STORAGE_KEY = `menzzu_active_tab:${STORE_SLUG || 'store'}`;
+
+function restoreActiveTab() {
+    try {
+        const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+        if (savedTab === 'delivery' || savedTab === 'order') state.activeTab = savedTab;
+    } catch (error) {
+        // Browsing still works when storage is unavailable.
+    }
+}
+
+function persistActiveTab() {
+    try {
+        localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, state.activeTab);
+    } catch (error) {
+        // Browsing still works when storage is unavailable.
+    }
+}
+
+function productShareSlug(product) {
+    const name = String(product?.name || 'produto')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'produto';
+    return `${name}-${product.id}`;
+}
+
+function setProductUrl(product) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('produto', productShareSlug(product));
+    window.history.replaceState({ productId: product.id }, '', url.toString());
+}
+
+function clearProductUrl() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('produto')) return;
+    url.searchParams.delete('produto');
+    window.history.replaceState({}, '', url.toString());
+}
+
+function getProductFromUrl() {
+    const productSlug = new URLSearchParams(window.location.search).get('produto');
+    if (!productSlug) return null;
+    return (state.products || []).find(product => productShareSlug(product) === productSlug) || null;
+}
 
 
 // Função auxiliar para alertas bonitos
@@ -675,6 +722,7 @@ function loadCart() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    restoreActiveTab();
     const marketplaceBackButton = document.getElementById('marketplace-back-btn');
     let enteredFromMarketplace = false;
     try {
@@ -715,6 +763,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrateFromSSR();
         initEventListeners();
         updateUI();
+        const linkedProduct = getProductFromUrl();
+        if (linkedProduct) openItemDetail(linkedProduct.id, { updateUrl: false });
         if (state.userInfo.phone) fetchPreviousOrders();
     }, 10);
 });
@@ -752,6 +802,11 @@ function hydrateFromSSR() {
             state.activeTab = 'delivery';
             document.body.classList.remove('theme-order');
         }
+        persistActiveTab();
+        document.querySelectorAll('.cat-tab').forEach(button => {
+            button.classList.toggle('active', button.dataset.tab === state.activeTab);
+        });
+        document.body.classList.toggle('theme-order', state.activeTab === 'order');
 
         updateFeaturedCardSizing();
 
@@ -1527,9 +1582,11 @@ function ensureDetailFooter() {
     lucide.createIcons();
 }
 
-function openItemDetail(productId) {
+function openItemDetail(productId, { updateUrl = true } = {}) {
     ensureDetailFooter();
     const item = state.products.find(p => p.id === productId);
+    if (!item) return;
+    if (updateUrl) setProductUrl(item);
     state.currentItem = item;
     state.currentQty = 1;
     state.currentVariation = null;
@@ -1802,6 +1859,7 @@ function moveCarousel(delta) {
 function closeWithAnimation(modalId) {
     const modal = document.getElementById(modalId);
     modal.classList.add('hidden');
+    if (modalId === 'item-detail-modal') clearProductUrl();
     if (modalId === 'order-status-modal') {
         if (state.orderStatusRefreshTimer) clearInterval(state.orderStatusRefreshTimer);
         state.orderStatusRefreshTimer = null;
@@ -2446,6 +2504,7 @@ function initEventListeners() {
             document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             state.activeTab = btn.dataset.tab;
+            persistActiveTab();
             document.body.classList.toggle('theme-order', state.activeTab === 'order');
             updateTheme(); // Muda as cores ao trocar de aba
             renderMenu();
