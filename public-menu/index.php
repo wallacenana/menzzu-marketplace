@@ -322,6 +322,71 @@ try {
     $stmt = $pdo->prepare("SELECT id, dayOfWeek, startTime, endTime, maxOrders FROM available_slot WHERE userId = ? ORDER BY dayOfWeek ASC, startTime ASC");
     $stmt->execute([$store['id']]);
     $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // JSON-LD reflects only the business data already visible on this menu page.
+    $usesHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+    $requestScheme = $usesHttps ? 'https' : 'http';
+    $requestHost = preg_replace('/[^a-zA-Z0-9.:-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'menzzu.com'));
+    $publicMenuUrl = $requestScheme . '://' . ($requestHost ?: 'menzzu.com') . '/' . rawurlencode($slug) . '/';
+    $schemaDayNames = [
+        0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
+        4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'
+    ];
+    $openingHoursSpecification = [];
+    foreach ($availableSlots as $slot) {
+        $day = (int) ($slot['dayOfWeek'] ?? -1);
+        $opens = substr((string) ($slot['startTime'] ?? ''), 0, 5);
+        $closes = substr((string) ($slot['endTime'] ?? ''), 0, 5);
+        if (!isset($schemaDayNames[$day]) || !preg_match('/^\d{2}:\d{2}$/', $opens) || !preg_match('/^\d{2}:\d{2}$/', $closes)) {
+            continue;
+        }
+        $openingHoursSpecification[] = [
+            '@type' => 'OpeningHoursSpecification',
+            'dayOfWeek' => $schemaDayNames[$day],
+            'opens' => $opens,
+            'closes' => $closes
+        ];
+    }
+    $restaurantSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'Restaurant',
+        '@id' => $publicMenuUrl . '#restaurant',
+        'name' => $businessName,
+        'url' => $publicMenuUrl,
+        'menu' => $publicMenuUrl,
+        'hasMap' => $storeMapUrl,
+        'image' => $logoUrl
+    ];
+    $schemaDescription = trim((string) ($store['seoDescription'] ?? ''));
+    if ($schemaDescription !== '') {
+        $restaurantSchema['description'] = $schemaDescription;
+    }
+    if ($businessCategory !== '') {
+        $restaurantSchema['servesCuisine'] = $businessCategory;
+    }
+    if ($storeAddress !== '') {
+        $schemaAddress = [
+            '@type' => 'PostalAddress',
+            'streetAddress' => $storeAddress,
+            'addressCountry' => 'BR'
+        ];
+        if (preg_match('/,\s*([^,]+?)\s*-\s*[A-Z]{2}(?:,|$)/u', $storeAddress, $schemaCityMatch)) {
+            $schemaAddress['addressLocality'] = trim($schemaCityMatch[1]);
+        }
+        $restaurantSchema['address'] = $schemaAddress;
+    }
+    if ($storeLat !== null && $storeLng !== null) {
+        $restaurantSchema['geo'] = [
+            '@type' => 'GeoCoordinates',
+            'latitude' => round((float) $storeLat, 6),
+            'longitude' => round((float) $storeLng, 6)
+        ];
+    }
+    if (!empty($openingHoursSpecification)) {
+        $restaurantSchema['openingHoursSpecification'] = $openingHoursSpecification;
+    }
+    $restaurantSchemaJson = json_encode($restaurantSchema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $hasVisibleProduct = count(array_filter($products, static function ($product) {
         return (int) ($product['active'] ?? 1) === 1 && strtolower((string) ($product['type'] ?? '')) !== 'addon';
     })) > 0;
@@ -418,6 +483,7 @@ try {
         <?php if (!empty($store['seoDescription'])): ?>
             <meta name="description" content="<?php echo htmlspecialchars($store['seoDescription']); ?>">
         <?php endif; ?>
+        <script type="application/ld+json"><?php echo $restaurantSchemaJson; ?></script>
         <title><?php echo $businessName; ?> | Cardápio Digital Menzzu</title>
         <link rel="icon" type="image/x-icon" href="<?php echo $faviconUrl; ?>">
         <link rel="preconnect" href="https://maps.googleapis.com" crossorigin>
