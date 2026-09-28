@@ -1335,9 +1335,9 @@ body.theme-dark .var-option.selected {
 }
 
 .addon-option-mark {
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     border: 2px solid #d1d5db;
     background: color-mix(in srgb, var(--text-main) 5%, var(--bg-color));
     flex: 0 0 auto;
@@ -1368,6 +1368,21 @@ body.theme-dark .var-option.selected {
 .addon-option.selected .addon-option-mark::after {
     opacity: 1;
     transform: rotate(45deg) scale(1);
+}
+
+.addon-option--radio .addon-option-mark::after {
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    transform: translate(-50%, -50%) scale(0.5);
+}
+
+.addon-option--radio.selected .addon-option-mark::after {
+    transform: translate(-50%, -50%) scale(1);
 }
 
 .suggested-product-card {

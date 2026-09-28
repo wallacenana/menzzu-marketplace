@@ -1803,7 +1803,8 @@ function openItemDetail(productId, { updateUrl = true } = {}) {
                             const inputId = `ag-${gi}-${ii}`;
                             const inputName = `ag-group-${gi}`;
                             const itemAccent = String(gItem.color || gItem.accent || gItem.accentColor || g.color || g.accentColor || 'var(--primary-color)').replace(/"/g, '&quot;');
-                            return `<label for="${inputId}" class="var-option addon-option" style="--addon-accent: ${itemAccent};" onclick="handleAddonSelect(event, '${g.id}', ${maxSelections}, ${gi}, ${ii}, ${parseFloat(gItem.price || 0)})">
+                            const selectionClass = maxSelections === 1 ? 'addon-option--radio' : 'addon-option--checkbox';
+                            return `<label for="${inputId}" class="var-option addon-option ${selectionClass}" style="--addon-accent: ${itemAccent};" onclick="handleAddonSelect(event, '${g.id}', ${maxSelections}, ${gi}, ${ii}, ${parseFloat(gItem.price || 0)})">
                                                 <div class="addon-option-main">
                                                     <span class="var-label">${gItem.name}</span>
                                                 </div>
