@@ -702,6 +702,16 @@ const setActiveCart = (newCart) => {
     saveCart();
 };
 
+function clearCompletedCheckout() {
+    setActiveCart([]);
+    state.couponCode = '';
+    state.couponQuote = null;
+    state.cashChangeFor = null;
+    saveCheckoutState();
+    updateUI();
+    closeWithAnimation('checkout-modal');
+}
+
 function saveCart() {
     const carts = {
         delivery: {
@@ -3707,7 +3717,7 @@ async function handlePlaceOrder() {
                 });
             }
 
-            setActiveCart([]);
+            clearCompletedCheckout();
             location.href = data.paymentLink;
         } else if (data.id) {
             if (state.paymentMethod === 'dinheiro') {
@@ -3718,7 +3728,7 @@ async function handlePlaceOrder() {
                     confirmButtonColor: getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#82F026',
                     confirmButtonText: 'Ver meus pedidos'
                 }).then(() => {
-                    setActiveCart([]);
+                    clearCompletedCheckout();
                     openPublicOrderStatus(data.id);
                     fetchPreviousOrders();
                 });
