@@ -138,6 +138,7 @@ let state = {
     isOpen: false,
     deliveryType: 'delivery',
     paymentMethod: 'mercadopago',
+    cashChangeFor: null,
     allowCash: true,
     withinDeliveryRadius: false,
     withinDeliveryRadius: false,
@@ -2886,6 +2887,7 @@ function saveCheckoutState() {
         activeTab: state.activeTab,
         deliveryType: state.deliveryType,
         paymentMethod: state.paymentMethod,
+        cashChangeFor: state.cashChangeFor || null,
         deliveryFee: state.deliveryFee || 0,
         orderSchedule: state.orderSchedule || null,
         couponCode: state.couponCode || '',
@@ -2915,6 +2917,7 @@ function restoreCheckoutState() {
         state.deliveryType = allowedMethods.includes(saved.deliveryType) ? saved.deliveryType : getDefaultFulfillmentMethod();
     }
     if (saved.paymentMethod) state.paymentMethod = saved.paymentMethod;
+    if (Number.isFinite(Number(saved.cashChangeFor)) && Number(saved.cashChangeFor) > 0) state.cashChangeFor = Number(saved.cashChangeFor);
     if (typeof saved.deliveryFee === 'number') state.deliveryFee = saved.deliveryFee;
     if (saved.orderSchedule && typeof saved.orderSchedule === 'object') {
         state.orderSchedule = {
@@ -3009,11 +3012,23 @@ function selectPaymentMethod(method) {
     document.querySelectorAll('.payment-card').forEach(el => {
         const isSelected = el.dataset.method === method;
         el.classList.toggle('selected', isSelected);
-        el.style.borderColor = isSelected ? 'var(--primary-color)' : '#e5e7eb';
-        el.style.backgroundColor = isSelected ? 'var(--primary-color)05' : '#fff';
+        const isCash = el.dataset.method === 'dinheiro';
+        el.style.borderColor = isCash ? (isSelected ? '#e11d48' : '#fecdd3') : (isSelected ? 'var(--primary-color)' : '#e5e7eb');
+        el.style.backgroundColor = isCash ? '#fff1f2' : (isSelected ? 'var(--primary-color)05' : '#fff');
         const checkIcon = el.querySelector('.payment-check-icon');
-        if (checkIcon) checkIcon.style.color = isSelected ? 'var(--primary-color)' : '#ccc';
+        if (checkIcon) checkIcon.style.color = isSelected ? (isCash ? '#e11d48' : 'var(--primary-color)') : '#ccc';
     });
+    const cashField = document.getElementById('cash-change-field');
+    if (cashField) cashField.style.display = method === 'dinheiro' ? 'block' : 'none';
+    updateStep4Summary();
+    saveCheckoutState();
+}
+
+function updateCashChangeFor(value) {
+    const normalized = String(value || '').replace(',', '.').trim();
+    state.cashChangeFor = normalized ? Number(normalized) : null;
+    saveCheckoutState();
+    updateStep4Summary();
 }
 
 function renderPaymentStep() {
@@ -3053,16 +3068,22 @@ function renderPaymentStep() {
 
     if (isCashAllowed) {
         html += `
-                                                <div class="payment-card" data-method="dinheiro" onclick="selectPaymentMethod('dinheiro')" style="display:flex; align-items:center; border:2px solid #e5e7eb; border-radius:12px; padding:12px; cursor:pointer; transition:0.2s;">
-                                                    <div class="payment-icon" style="background:#fef3c7; color:#d97706; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:12px;">
-                                                        <i data-lucide="banknote"></i>
+                                                <div class="payment-card" data-method="dinheiro" onclick="selectPaymentMethod('dinheiro')" style="border:2px solid #fecdd3; border-radius:12px; padding:12px; cursor:pointer; transition:0.2s; background:#fff1f2;">
+                                                    <div style="display:flex; align-items:center;">
+                                                        <div class="payment-icon" style="background:#ffe4e6; color:#e11d48; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-right:12px;">
+                                                            <i data-lucide="banknote"></i>
+                                                        </div>
+                                                        <div class="payment-info" style="flex:1;">
+                                                            <h4 style="margin:0; font-size:1rem; color:#9f1239;">Dinheiro</h4>
+                                                            <p style="margin:0; font-size:0.8rem; color:#be123c; font-weight:600;">Pagamento na entrega ou retirada.</p>
+                                                        </div>
+                                                        <div class="payment-check-icon" style="color:#ccc; margin-left:auto;">
+                                                            <i data-lucide="check-circle-2"></i>
+                                                        </div>
                                                     </div>
-                                                    <div class="payment-info" style="flex:1;">
-                                                        <h4 style="margin:0; font-size:1rem;">Dinheiro</h4>
-                                                        <p style="margin:0; font-size:0.8rem; color:#6b7280;">Pagamento na entrega ou retirada.</p>
-                                                    </div>
-                                                    <div class="payment-check-icon" style="color:#ccc;">
-                                                        <i data-lucide="check-circle-2"></i>
+                                                    <div id="cash-change-field" onclick="event.stopPropagation()" style="display:${state.paymentMethod === 'dinheiro' ? 'block' : 'none'}; margin-top:12px; padding-top:12px; border-top:1px solid #fecdd3;">
+                                                        <label style="display:block; font-size:0.82rem; font-weight:800; color:#9f1239; margin-bottom:6px;">Precisa de troco para qual valor?</label>
+                                                        <input type="number" min="0" step="0.01" inputmode="decimal" value="${state.cashChangeFor || ''}" oninput="updateCashChangeFor(this.value)" placeholder="Ex.: 50,00" class="ifood-input" style="border-color:#fda4af; background:#fff;">
                                                     </div>
                                                 </div>
                                             `;
@@ -3271,9 +3292,11 @@ function updateStep4Summary() {
 
     if (paymentSummaryEl) {
         if (state.paymentMethod === 'dinheiro') {
-            paymentSummaryEl.innerHTML = '<i data-lucide="banknote" style="vertical-align: middle; margin-right: 5px;"></i> Pagamento em Dinheiro';
-            paymentSummaryEl.style.background = '#fef3c7';
-            paymentSummaryEl.style.color = '#d97706';
+            const totalForChange = subtotal + fee;
+            const change = Number(state.cashChangeFor) > totalForChange ? Number(state.cashChangeFor) - totalForChange : 0;
+            paymentSummaryEl.innerHTML = `<i data-lucide="banknote" style="vertical-align: middle; margin-right: 5px;"></i> Pagamento em Dinheiro${change > 0 ? ` · Troco: R$ ${change.toFixed(2).replace('.', ',')}` : ''}`;
+            paymentSummaryEl.style.background = '#ffe4e6';
+            paymentSummaryEl.style.color = '#9f1239';
         } else {
             paymentSummaryEl.innerHTML = '<i data-lucide="credit-card" style="vertical-align: middle; margin-right: 5px;"></i> Pix ou Crédito (Online)';
             paymentSummaryEl.style.background = '#f0fdf4';
@@ -3515,6 +3538,11 @@ async function handlePlaceOrder() {
     }
 
     const totalValue = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) + (state.deliveryType === 'delivery' ? state.deliveryFee : 0);
+    if (state.paymentMethod === 'dinheiro' && Number(state.cashChangeFor) > 0 && Number(state.cashChangeFor) < totalValue) {
+        btn.disabled = false;
+        btn.innerHTML = 'Fazer pedido';
+        return showAlert('Troco inválido', 'O valor informado para troco deve ser igual ou maior que o total do pedido.');
+    }
 
     const formatItemName = (item) => {
         let base = item.name + (item.variation ? ` (${item.variation})` : '');
@@ -3556,6 +3584,7 @@ async function handlePlaceOrder() {
         couponCode: state.couponCode || null,
         deliveryFee: state.deliveryType === 'delivery' ? state.deliveryFee : 0,
         paymentMethod: String(state.paymentMethod || '').trim().toLowerCase() === 'dinheiro' ? 'dinheiro' : state.paymentMethod,
+        cashChangeFor: state.paymentMethod === 'dinheiro' && Number(state.cashChangeFor) > 0 ? Number(state.cashChangeFor) : null,
         totalValue: totalValue,
         addons: getOrderAddonsJSON(cart[0]),
         cartItems: cart.map(item => ({
