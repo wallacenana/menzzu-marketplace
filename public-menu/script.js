@@ -945,6 +945,55 @@ function loadGoogleMaps(apiKey) {
     document.head.appendChild(script);
 }
 
+let postalCodeLookupTimer = null;
+let structuredAddressGeocodeTimer = null;
+
+function formatPostalCode(value) {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+    return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+}
+
+function setAddressLocationStatus(message) {
+    const status = document.getElementById('restaurant-location-coordinates');
+    if (status) status.textContent = message;
+}
+
+async function lookupPostalCode(postalCode) {
+    const cepInput = document.getElementById('user-address-cep');
+    const streetInput = document.getElementById('user-address');
+    const numberInput = document.getElementById('user-address-number');
+    const normalizedPostalCode = String(postalCode || '').replace(/\D/g, '');
+    if (normalizedPostalCode.length !== 8 || !cepInput || !streetInput) return;
+
+    setAddressLocationStatus('Buscando endereço pelo CEP...');
+    try {
+        const response = await fetch(`https://viacep.com.br/ws/${normalizedPostalCode}/json/`);
+        const data = await response.json();
+        if (!response.ok || data?.erro) throw new Error('CEP não encontrado');
+
+        streetInput.value = String(data.logradouro || '').trim();
+        streetInput.dataset.locality = [data.bairro, data.localidade].filter(Boolean).join(', ');
+        streetInput.dataset.region = String(data.uf || '').trim();
+        clearAddressCoordinates();
+        if (streetInput.value) {
+            setAddressLocationStatus('Endereço preenchido. Informe o número para confirmar no mapa.');
+            numberInput?.focus();
+        } else {
+            setAddressLocationStatus('CEP encontrado. Informe a rua e o número para confirmar no mapa.');
+            streetInput.focus();
+        }
+    } catch (error) {
+        setAddressLocationStatus('Não encontramos este CEP. Confira os números ou informe o endereço manualmente.');
+    }
+}
+
+function scheduleStructuredAddressGeocode() {
+    clearTimeout(structuredAddressGeocodeTimer);
+    const address = getStructuredAddress();
+    if (!address.isComplete) return;
+    structuredAddressGeocodeTimer = setTimeout(() => geocodeAddress(address.searchAddress), 450);
+}
+
 window.initMapsAutocomplete = () => {
     const input = document.getElementById('user-address');
     const cepInput = document.getElementById('user-address-cep');
@@ -970,7 +1019,17 @@ window.initMapsAutocomplete = () => {
         });
 
         [cepInput, input, numberInput].filter(Boolean).forEach((field) => {
-            field.addEventListener('input', () => clearAddressCoordinates(), { passive: true });
+            field.addEventListener('input', () => {
+                if (field === cepInput) {
+                    cepInput.value = formatPostalCode(cepInput.value);
+                    clearTimeout(postalCodeLookupTimer);
+                    if (cepInput.value.replace(/\D/g, '').length === 8) {
+                        postalCodeLookupTimer = setTimeout(() => lookupPostalCode(cepInput.value), 250);
+                    }
+                }
+                clearAddressCoordinates();
+                if (field !== cepInput) scheduleStructuredAddressGeocode();
+            }, { passive: true });
             field.addEventListener('change', () => {
                 if (getStructuredAddress().isComplete) geocodeAddress(getStructuredAddress().searchAddress);
             });
