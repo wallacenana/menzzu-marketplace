@@ -127,20 +127,19 @@ body.theme-dark .addon-option.disabled {
     border-color: rgba(255, 255, 255, 0.08);
 }
 
-body.theme-dark .addon-option.disabled .addon-option-mark {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.10);
-}
-
 .addon-group-header {
     background:
         color-mix(in srgb, var(--text-main) 5%, var(--bg-color));
     border-bottom: 1px solid color-mix(in srgb, var(--text-main) 5%, transparent);
 }
 
-body.theme-dark .addon-option-mark {
-    background: rgba(0, 0, 0, .2);
-    border-color: rgba(255, 255, 255, 0.12);
+body.theme-dark .addon-option-controls {
+    background: rgba(0, 0, 0, .18);
+}
+
+body.theme-dark .addon-qty-btn {
+    background: rgba(255, 255, 255, .08);
+    color: var(--text-main);
 }
 
 body.theme-dark .addon-group-header {
@@ -1297,12 +1296,6 @@ body.theme-dark .var-option.selected {
     color: #a8a29e;
 }
 
-.addon-option.disabled .addon-option-mark {
-    border-color: #d6d3d1;
-    background: #f8fafc;
-    box-shadow: none;
-}
-
 .addon-option-main {
     display: flex;
     align-items: center;
@@ -1334,55 +1327,58 @@ body.theme-dark .var-option.selected {
     white-space: nowrap;
 }
 
-.addon-option-mark {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid #d1d5db;
+.addon-option-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 32px;
+    padding: 3px;
+    border-radius: 999px;
     background: color-mix(in srgb, var(--text-main) 5%, var(--bg-color));
-    flex: 0 0 auto;
-    position: relative;
-    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.addon-option-mark::after {
-    content: '';
-    position: absolute;
-    left: 5px;
-    top: 1px;
-    width: 5px;
-    height: 10px;
-    border: solid var(--btn-text);
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg) scale(0.85);
-    opacity: 0;
-    transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.addon-option.selected .addon-option-mark {
-    border-color: var(--addon-accent, var(--primary-color));
-    background: var(--addon-accent, var(--primary-color));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--addon-accent, var(--primary-color)) 18%, transparent);
-}
-
-.addon-option.selected .addon-option-mark::after {
-    opacity: 1;
-    transform: rotate(45deg) scale(1);
-}
-
-.addon-option--radio .addon-option-mark::after {
-    left: 50%;
-    top: 50%;
-    width: 8px;
-    height: 8px;
+.addon-qty-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
     border: 0;
     border-radius: 50%;
-    background: #fff;
-    transform: translate(-50%, -50%) scale(0.5);
+    background: var(--surface-color);
+    color: var(--text-main);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(36, 24, 20, .08);
 }
 
-.addon-option--radio.selected .addon-option-mark::after {
-    transform: translate(-50%, -50%) scale(1);
+.addon-qty-btn:hover {
+    background: color-mix(in srgb, var(--addon-accent, var(--primary-color)) 12%, var(--surface-color));
+}
+
+.addon-qty-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.25;
+}
+
+.addon-option-quantity {
+    min-width: 14px;
+    color: var(--text-main);
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+}
+
+.addon-option:not(.selected) .addon-option-controls {
+    padding: 0;
+    background: transparent;
+}
+
+.addon-option:not(.selected) .addon-qty-decrease,
+.addon-option:not(.selected) .addon-option-quantity {
+    display: none;
 }
 
 .suggested-product-card {

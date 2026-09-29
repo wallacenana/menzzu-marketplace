@@ -1801,18 +1801,20 @@ function openItemDetail(productId, { updateUrl = true } = {}) {
                                         <div class="addon-options">
                                         ${gItems.map((gItem, ii) => {
                             const inputId = `ag-${gi}-${ii}`;
-                            const inputName = `ag-group-${gi}`;
                             const itemAccent = String(gItem.color || gItem.accent || gItem.accentColor || g.color || g.accentColor || 'var(--primary-color)').replace(/"/g, '&quot;');
-                            const selectionClass = maxSelections === 1 ? 'addon-option--radio' : 'addon-option--checkbox';
-                            return `<label for="${inputId}" class="var-option addon-option ${selectionClass}" style="--addon-accent: ${itemAccent};" onclick="handleAddonSelect(event, '${g.id}', ${maxSelections}, ${gi}, ${ii}, ${parseFloat(gItem.price || 0)})">
+                            return `<label for="${inputId}" class="var-option addon-option" style="--addon-accent: ${itemAccent};" onclick="handleAddonSelect(event, '${g.id}', ${maxSelections}, ${gi}, ${ii})">
                                                 <div class="addon-option-main">
                                                     <span class="var-label">${gItem.name}</span>
                                                 </div>
                                                 <div class="addon-option-meta">
                                                     ${parseFloat(gItem.price || 0) > 0 ? `<span class="var-price addon-option-price">+ R$ ${parseFloat(gItem.price).toFixed(2)}</span>` : ''}
-                                                    <span class="addon-option-mark" aria-hidden="true"></span>
+                                                    <span class="addon-option-controls" aria-label="Quantidade de ${gItem.name}">
+                                                        <button type="button" class="addon-qty-btn addon-qty-decrease" aria-label="Remover ${gItem.name}" onclick="changeAddonQuantity(event, '${g.id}', ${maxSelections}, ${gi}, ${ii}, -1)"><i data-lucide="trash-2"></i></button>
+                                                        <span class="addon-option-quantity" aria-live="polite">0</span>
+                                                        <button type="button" class="addon-qty-btn addon-qty-increase" aria-label="Adicionar ${gItem.name}" onclick="changeAddonQuantity(event, '${g.id}', ${maxSelections}, ${gi}, ${ii}, 1)"><i data-lucide="plus"></i></button>
+                                                    </span>
                                                 </div>
-                                                <input type="checkbox" id="${inputId}" name="${inputName}" class="addon-input" data-group-id="${g.id}" data-group-name="${g.name.replace(/"/g, '&quot;')}" data-max="${maxSelections}" data-item-name="${gItem.name.replace(/"/g, '&quot;')}" data-item-price="${parseFloat(gItem.price || 0)}">
+                                                <input type="checkbox" id="${inputId}" class="addon-input" data-quantity="0" data-group-id="${g.id}" data-group-name="${g.name.replace(/"/g, '&quot;')}" data-max="${maxSelections}" data-item-name="${gItem.name.replace(/"/g, '&quot;')}" data-item-price="${parseFloat(gItem.price || 0)}">
                                             </label>`;
                         }).join('')}
                                         </div>
@@ -2050,11 +2052,12 @@ function syncAddonGroupState(groupSection) {
     if (!groupSection) return;
     const maxAllowed = Math.max(parseInt(groupSection.dataset.max || '1', 10) || 1, 1);
     const inputs = Array.from(groupSection.querySelectorAll('.addon-input'));
-    const selectedCount = inputs.filter(input => input.checked).length;
+    const selectedCount = inputs.reduce((total, input) => total + getAddonQuantity(input), 0);
 
     inputs.forEach(input => {
         const label = input.closest('label');
-        const isSelected = input.checked;
+        const quantity = getAddonQuantity(input);
+        const isSelected = quantity > 0;
         const isDisabled = !isSelected && selectedCount >= maxAllowed;
 
         input.disabled = isDisabled;
@@ -2062,52 +2065,51 @@ function syncAddonGroupState(groupSection) {
         if (label) {
             label.classList.toggle('selected', isSelected);
             label.classList.toggle('disabled', isDisabled);
+            const quantityEl = label.querySelector('.addon-option-quantity');
+            const decreaseButton = label.querySelector('.addon-qty-decrease');
+            if (quantityEl) quantityEl.textContent = quantity;
+            if (decreaseButton) {
+                const isSingleItem = quantity === 1;
+                decreaseButton.setAttribute('aria-label', `${isSingleItem ? 'Remover' : 'Diminuir'} ${input.dataset.itemName || 'opção'}`);
+                decreaseButton.innerHTML = `<i data-lucide="${isSingleItem ? 'trash-2' : 'minus'}"></i>`;
+            }
         }
     });
+
+    if (window.lucide) lucide.createIcons();
 }
 
-function handleAddonSelect(event, groupId, maxSelections, gi, ii, price) {
+function getAddonQuantity(input) {
+    return Math.max(parseInt(input?.dataset?.quantity || '0', 10) || 0, 0);
+}
+
+function changeAddonQuantity(event, groupId, maxSelections, gi, ii, delta) {
     event.preventDefault();
+    event.stopPropagation();
     const inputId = `ag-${gi}-${ii}`;
     const input = document.getElementById(inputId);
     if (!input) return;
     const label = input.closest('label');
     const groupSection = label?.closest('.addon-group-section');
     const maxAllowed = Math.max(parseInt(maxSelections, 10) || 1, 1);
-    const willSelect = !input.checked;
+    const currentQuantity = getAddonQuantity(input);
+    const selectedCount = groupSection
+        ? Array.from(groupSection.querySelectorAll('.addon-input')).reduce((total, option) => total + getAddonQuantity(option), 0)
+        : 0;
 
-    if (input.disabled && !input.checked) {
-        return;
-    }
+    if (delta > 0 && selectedCount >= maxAllowed) return;
+    const nextQuantity = Math.max(currentQuantity + delta, 0);
+    if (nextQuantity === currentQuantity) return;
 
-    if (maxAllowed <= 1) {
-        const isCurrentlySelected = input.checked;
-
-        // Desmarca visuais do grupo
-        (groupSection ? groupSection.querySelectorAll('.addon-input') : document.querySelectorAll(`[data-group-id="${groupId}"].addon-input`)).forEach(el => {
-            el.checked = false;
-            const option = el.closest('label');
-            if (option) option.classList.remove('selected');
-        });
-
-        if (isCurrentlySelected) {
-            syncAddonGroupState(groupSection);
-            updateDetailFooter();
-            return;
-        }
-
-        input.checked = true;
-    } else {
-        const selectedCount = groupSection ? groupSection.querySelectorAll('.addon-input:checked').length : 0;
-        if (willSelect && maxAllowed > 0 && selectedCount >= maxAllowed) {
-            syncAddonGroupState(groupSection);
-            return;
-        }
-        input.checked = willSelect;
-    }
+    input.dataset.quantity = String(nextQuantity);
+    input.checked = nextQuantity > 0;
 
     syncAddonGroupState(groupSection);
     updateDetailFooter();
+}
+
+function handleAddonSelect(event, groupId, maxSelections, gi, ii) {
+    changeAddonQuantity(event, groupId, maxSelections, gi, ii, 1);
 }
 
 function getSelectedAddons() {
@@ -2115,13 +2117,15 @@ function getSelectedAddons() {
     let addonTotal = 0;
     document.querySelectorAll('.addon-input:checked').forEach(input => {
         const price = parseFloat(input.dataset.itemPrice || 0);
+        const quantity = getAddonQuantity(input);
         addons.push({
             groupId: input.dataset.groupId,
             groupName: input.dataset.groupName,
             name: input.dataset.itemName,
-            price
+            price,
+            quantity
         });
-        addonTotal += price;
+        addonTotal += price * quantity;
     });
     return {
         addons,
@@ -2223,14 +2227,14 @@ function validateCurrentItemSelections() {
     const groups = (state.addonGroups || []).filter(g => groupIds.includes(g.id));
     for (const g of groups) {
         const maxAllowed = Math.max(parseInt(g.max, 10) || 1, 1);
-        const checked = document.querySelectorAll(`.addon-input[data-group-id="${g.id}"]:checked`).length;
-        if (g.min > 0 && checked < g.min) {
+        const quantity = Array.from(document.querySelectorAll(`.addon-input[data-group-id="${g.id}"]`)).reduce((total, input) => total + getAddonQuantity(input), 0);
+        if (g.min > 0 && quantity < g.min) {
             return {
                 ok: false,
                 message: `Selecione pelo menos ${g.min} opção em "${g.name}".`
             };
         }
-        if (checked > maxAllowed) {
+        if (quantity > maxAllowed) {
             return {
                 ok: false,
                 message: `O grupo "${g.name}" permite no máximo ${maxAllowed} opção(ões).`
@@ -2771,7 +2775,7 @@ function renderCartStep() {
                                 <strong>${item.name}</strong>
                                 ${item.variation ? `<p style="font-size: 0.75rem; color: var(--text-gray);">${item.variation}</p>` : ''}
                                 ${getCustomFieldSummaryParts(item).map(({ key, value, isUrl }) => '<p style="font-size:0.7rem;color:var(--text-gray);margin-top:2px;"><b>' + key + ':</b> ' + (isUrl ? '<a href="' + value + '" target="_blank" style="color:var(--primary-color);">Ver Imagem</a>' : String(value)) + '</p>').join('')}
-                                ${item.addons ? (() => { try { const ads = JSON.parse(item.addons); return ads.map(a => '<p style="font-size:0.7rem;color:var(--text-gray);margin-top:2px;">- ' + a.name + (a.price > 0 ? ' (R$ ' + parseFloat(a.price).toFixed(2) + ')' : '') + '</p>').join(''); } catch (e) { return ''; } })() : ''}
+                                ${item.addons ? (() => { try { const ads = JSON.parse(item.addons); return ads.map(a => '<p style="font-size:0.7rem;color:var(--text-gray);margin-top:2px;">- ' + (a.quantity > 1 ? a.quantity + 'x ' : '') + a.name + (a.price > 0 ? ' (R$ ' + (parseFloat(a.price) * (parseInt(a.quantity, 10) || 1)).toFixed(2) + ')' : '') + '</p>').join(''); } catch (e) { return ''; } })() : ''}
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 16px;">
@@ -3099,7 +3103,7 @@ function updateStep4Summary() {
                         <div style="margin-bottom: 8px;">
                             <p style="font-size: 0.9rem; margin-bottom: 0;">${item.quantity}x ${item.name} ${item.variation ? `(${item.variation}${item.subItem ? ' - ' + item.subItem : ''})` : ''}</p>
                             ${getCustomFieldSummaryParts(item).map(({ key, value, isUrl }) => '<p style="font-size:0.75rem;color:var(--text-gray);margin-left:15px;margin-bottom:0;">- ' + key + ': ' + (isUrl ? 'Anexo' : String(value)) + '</p>').join('')}
-                            ${item.addons ? (() => { try { const ads = JSON.parse(item.addons); return ads.map(a => '<p style="font-size:0.75rem;color:var(--text-gray);margin-left:15px;margin-bottom:0;">- ' + a.name + '</p>').join(''); } catch (e) { return ''; } })() : ''}
+                            ${item.addons ? (() => { try { const ads = JSON.parse(item.addons); return ads.map(a => '<p style="font-size:0.75rem;color:var(--text-gray);margin-left:15px;margin-bottom:0;">- ' + (a.quantity > 1 ? a.quantity + 'x ' : '') + a.name + '</p>').join(''); } catch (e) { return ''; } })() : ''}
                         </div>
                     `).join('');
     }
@@ -3157,13 +3161,13 @@ function commitAddToCart() {
     for (const g of groups) {
         const maxAllowed = Math.max(parseInt(g.max, 10) || 1, 1);
         if (g.min > 0) {
-            const checked = document.querySelectorAll(`.addon-input[data-group-id="${g.id}"]:checked`).length;
-            if (checked < g.min) {
+            const quantity = Array.from(document.querySelectorAll(`.addon-input[data-group-id="${g.id}"]`)).reduce((total, input) => total + getAddonQuantity(input), 0);
+            if (quantity < g.min) {
                 return showAlert('Atenção', `Selecione pelo menos ${g.min} opção em "${g.name}".`);
             }
         }
-        const checked = document.querySelectorAll(`.addon-input[data-group-id="${g.id}"]:checked`).length;
-        if (checked > maxAllowed) {
+        const quantity = Array.from(document.querySelectorAll(`.addon-input[data-group-id="${g.id}"]`)).reduce((total, input) => total + getAddonQuantity(input), 0);
+        if (quantity > maxAllowed) {
             return showAlert('Atenção', `O grupo "${g.name}" permite no máximo ${maxAllowed} opção(ões).`);
         }
     }
@@ -3325,7 +3329,7 @@ async function handlePlaceOrder() {
             try {
                 const ads = JSON.parse(item.addons);
                 ads.forEach(a => {
-                    if (!a.isCustomField) extras.push(a.name);
+                    if (!a.isCustomField) extras.push(`${Number(a.quantity) > 1 ? `${a.quantity}x ` : ''}${a.name}`);
                 });
             } catch (e) { }
         }
