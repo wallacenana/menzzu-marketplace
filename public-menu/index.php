@@ -331,6 +331,17 @@ try {
     $requestScheme = $usesHttps ? 'https' : 'http';
     $requestHost = preg_replace('/[^a-zA-Z0-9.:-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'menzzu.com'));
     $publicMenuUrl = $requestScheme . '://' . ($requestHost ?: 'menzzu.com') . '/' . rawurlencode($slug) . '/';
+    $shareTitle = trim($businessName) . ' | Cardápio Digital Menzzu';
+    $shareDescription = trim((string) ($store['seoDescription'] ?? ''));
+    if ($shareDescription === '') {
+        $shareDescription = 'Confira o cardápio, faça seu pedido e acompanhe as novidades de ' . trim($businessName) . '.';
+    }
+    $shareImageUrl = trim((string) $logoUrl);
+    if (strpos($shareImageUrl, '//') === 0) {
+        $shareImageUrl = $requestScheme . ':' . $shareImageUrl;
+    } elseif (!preg_match('#^https?://#i', $shareImageUrl)) {
+        $shareImageUrl = $requestScheme . '://' . ($requestHost ?: 'menzzu.com') . '/' . ltrim($shareImageUrl, '/');
+    }
     $schemaDayNames = [
         0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
         4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'
@@ -487,6 +498,19 @@ try {
         <?php if (!empty($store['seoDescription'])): ?>
             <meta name="description" content="<?php echo htmlspecialchars($store['seoDescription']); ?>">
         <?php endif; ?>
+        <link rel="canonical" href="<?php echo htmlspecialchars($publicMenuUrl, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta property="og:type" content="website">
+        <meta property="og:locale" content="pt_BR">
+        <meta property="og:site_name" content="Menzzu">
+        <meta property="og:title" content="<?php echo htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta property="og:description" content="<?php echo htmlspecialchars($shareDescription, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta property="og:url" content="<?php echo htmlspecialchars($publicMenuUrl, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta property="og:image" content="<?php echo htmlspecialchars($shareImageUrl, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta property="og:image:alt" content="<?php echo htmlspecialchars('Logo de ' . trim($businessName), ENT_QUOTES, 'UTF-8'); ?>">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="<?php echo htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta name="twitter:description" content="<?php echo htmlspecialchars($shareDescription, ENT_QUOTES, 'UTF-8'); ?>">
+        <meta name="twitter:image" content="<?php echo htmlspecialchars($shareImageUrl, ENT_QUOTES, 'UTF-8'); ?>">
         <script type="application/ld+json"><?php echo $restaurantSchemaJson; ?></script>
         <title><?php echo $businessName; ?> | Cardápio Digital Menzzu</title>
         <link rel="icon" type="image/x-icon" href="<?php echo $faviconUrl; ?>">
