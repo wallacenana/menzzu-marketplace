@@ -3763,13 +3763,14 @@ async function fetchPreviousOrders() {
 }
 
 function getOrderStatusStages(order) {
-    const isDelivery = String(order?.type || '').toLowerCase() === 'delivery';
+    const fulfillment = String(order?.deliveryAddress || '').trim().toLowerCase();
+    const isPickup = !fulfillment || /retirada\s+na\s+loja|retirada\s+no\s+local|consumo\s+no\s+local/.test(fulfillment);
     return [
         { id: 'waiting_payment', label: 'Aguardando pagamento' },
         { id: 'pending', label: 'Pagamento confirmado' },
         { id: 'accepted', label: 'Pedido aceito' },
         { id: 'production', label: 'Em preparação' },
-        { id: 'ready', label: isDelivery ? 'Saiu para entrega' : 'Pronto para retirada' },
+        { id: 'ready', label: isPickup ? 'Pronto para retirada' : 'Saiu para entrega' },
         { id: 'completed', label: 'Finalizado' }
     ];
 }
