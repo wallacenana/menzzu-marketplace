@@ -476,7 +476,9 @@ function openScheduleModal(context = 'add') {
     const dateInput = document.getElementById('schedule-date');
     const timeSelect = document.getElementById('schedule-time');
     const note = document.getElementById('schedule-availability-note');
+    const couponInput = document.getElementById('schedule-coupon');
     const earliestDate = getEarliestOrderDate();
+    if (couponInput) couponInput.value = state.couponCode || '';
     if (dateInput) {
         dateInput.min = earliestDate;
         dateInput.value = state.orderSchedule?.date >= earliestDate
@@ -2750,6 +2752,7 @@ function restoreCheckoutState() {
             time: saved.orderSchedule.time || ''
         };
     }
+    if (saved.couponCode) state.couponCode = String(saved.couponCode).trim().toUpperCase();
     if (saved.orderDetailsInfo) {
         state.orderDetailsInfo = saved.orderDetailsInfo;
     }
@@ -2775,6 +2778,8 @@ document.getElementById('checkout-back-btn')?.addEventListener('click', () => {
 function renderCustomerStep() {
     document.getElementById('user-name').value = state.userInfo.name || '';
     document.getElementById('user-phone').value = state.userInfo.phone || '';
+    const checkoutCouponInput = document.getElementById('checkout-coupon');
+    if (checkoutCouponInput) checkoutCouponInput.value = state.couponCode || '';
     document.getElementById('next-step-btn').disabled = false;
 }
 
@@ -3038,6 +3043,7 @@ async function handleNextStep() {
         if (!nameVal || !phoneVal || phoneVal.length < 14) return showAlert('Ops!', 'Preencha seu nome e um WhatsApp válido.');
         state.userInfo.name = nameVal;
         state.userInfo.phone = phoneVal;
+        state.couponCode = String(document.getElementById('checkout-coupon')?.value || '').trim().toUpperCase();
         saveCheckoutState();
         if (state.activeTab === 'delivery' && !state.isOpen) {
             return showAlert('Loja Fechada', isOrderEnabled() ?
@@ -3374,7 +3380,7 @@ async function handlePlaceOrder() {
             : (state.deliveryType === 'local' ? 'Consumo no Local' : 'Retirada na Loja'),
         scheduledDate: state.activeTab === 'order' ? state.orderSchedule?.date || null : null,
         scheduledTime: state.activeTab === 'order' ? state.orderSchedule?.time || null : null,
-        couponCode: state.activeTab === 'order' ? state.couponCode || null : null,
+        couponCode: state.couponCode || null,
         deliveryFee: state.deliveryType === 'delivery' ? state.deliveryFee : 0,
         paymentMethod: String(state.paymentMethod || '').trim().toLowerCase() === 'dinheiro' ? 'dinheiro' : state.paymentMethod,
         totalValue: totalValue,

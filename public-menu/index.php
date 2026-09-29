@@ -971,6 +971,10 @@ try {
                             <label class="field-label">WhatsApp</label>
                             <input type="tel" id="user-phone" class="ifood-input" placeholder="(00) 00000-0000">
                         </div>
+                        <div class="form-group">
+                            <label class="field-label">Cupom (opcional)</label>
+                            <input type="text" id="checkout-coupon" class="ifood-input" placeholder="Digite seu cupom" autocomplete="off" style="text-transform:uppercase;">
+                        </div>
                     </div>
 
                     <!-- Step 2: Cart -->
