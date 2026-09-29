@@ -150,6 +150,7 @@ let state = {
     orderAvailability: null,
     orderSchedule: null,
     couponCode: '',
+    couponQuote: null,
     scheduleModalContext: null,
     bodyScrollY: 0,
     isBodyScrollLocked: false,
@@ -2956,6 +2957,32 @@ function renderCustomerStep() {
     document.getElementById('next-step-btn').disabled = false;
 }
 
+async function loadCouponQuote() {
+    const code = String(state.couponCode || '').trim().toUpperCase();
+    if (!code) {
+        state.couponQuote = null;
+        return null;
+    }
+
+    const response = await fetch(`${API_BASE}/orders/coupon-preview?slug=${encodeURIComponent(STORE_SLUG)}&couponCode=${encodeURIComponent(code)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Cupom inválido.');
+    state.couponQuote = data;
+    return data;
+}
+
+function getCartPriceSummary(cart) {
+    const subtotal = cart.reduce((total, item) => total + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+    const quote = state.couponQuote;
+    if (!quote || !state.couponCode) return { subtotal, discount: 0, total: subtotal };
+
+    const rawDiscount = quote.discountType === 'percent'
+        ? subtotal * (Math.min(Math.max(Number(quote.discountValue) || 0, 0), 100) / 100)
+        : Number(quote.discountValue) || 0;
+    const discount = Math.min(Math.max(rawDiscount, 0), subtotal);
+    return { subtotal, discount, total: Math.max(0, subtotal - discount) };
+}
+
 function renderCartStep() {
     const cart = getActiveCart();
     const list = document.getElementById('checkout-items-list');
@@ -2965,6 +2992,21 @@ function renderCartStep() {
         return;
     }
     document.getElementById('next-step-btn').disabled = false;
+    if (state.couponCode && !state.couponQuote) {
+        loadCouponQuote()
+            .then(() => { if (state.currentStep === 2) renderCartStep(); })
+            .catch(() => { state.couponCode = ''; state.couponQuote = null; saveCheckoutState(); });
+    }
+    const summary = getCartPriceSummary(cart);
+    const couponSummary = state.couponQuote ? `
+        <div class="cart-price-summary">
+            <div><span>Subtotal</span><strong>R$ ${summary.subtotal.toFixed(2)}</strong></div>
+            <div class="cart-coupon-discount"><span>Cupom ${state.couponQuote.code || state.couponCode}</span><strong>${summary.discount > 0 ? `- R$ ${summary.discount.toFixed(2)}` : (state.couponQuote.freeDelivery ? 'Frete grátis' : '- R$ 0.00')}</strong></div>
+            <div class="cart-price-total"><span>Total</span><strong>R$ ${summary.total.toFixed(2)}</strong></div>
+        </div>` : `
+        <div class="cart-price-summary cart-price-summary--single">
+            <div class="cart-price-total"><span>Total</span><strong>R$ ${summary.total.toFixed(2)}</strong></div>
+        </div>`;
     list.innerHTML = cart.map(item => `
                     <div class="checkout-item">
                         <div class="item-name-qty">
@@ -2988,7 +3030,7 @@ function renderCartStep() {
                             <div class="item-price">R$ ${(item.price * item.quantity).toFixed(2)}</div>
                         </div>
                     </div>
-                `).join('');
+                `).join('') + couponSummary;
     lucide.createIcons();
 }
 
@@ -3234,8 +3276,18 @@ async function handleNextStep() {
         if (!nameVal || !phoneVal || phoneVal.length < 14) return showAlert('Ops!', 'Preencha seu nome e um WhatsApp válido.');
         state.userInfo.name = nameVal;
         state.userInfo.phone = phoneVal;
-        state.couponCode = String(document.getElementById('checkout-coupon')?.value || '').trim().toUpperCase();
+        const couponCode = String(document.getElementById('checkout-coupon')?.value || '').trim().toUpperCase();
+        if (couponCode !== state.couponCode) state.couponQuote = null;
+        state.couponCode = couponCode;
         saveCheckoutState();
+        if (state.couponCode) {
+            try {
+                await loadCouponQuote();
+            } catch (couponError) {
+                state.couponQuote = null;
+                return showAlert('Cupom inválido', couponError.message);
+            }
+        }
         if (state.activeTab === 'delivery' && !state.isOpen) {
             return showAlert('Loja Fechada', isOrderEnabled() ?
                 'Estamos fechados para pronta entrega no momento. Por favor, utilize a aba de Encomendas para agendar seu pedido.' :
