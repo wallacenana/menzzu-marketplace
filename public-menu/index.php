@@ -1100,6 +1100,11 @@ try {
                                     <span>Taxa de entrega</span>
                                     <span id="summary-fee">R$ 0,00</span>
                                 </div>
+                                <div id="coupon-discount-line" class="summary-row hidden"
+                                    style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #07865d;">
+                                    <span id="summary-coupon-label">Cupom</span>
+                                    <span id="summary-coupon-discount">- R$ 0,00</span>
+                                </div>
                                 <div class="summary-total-row"
                                     style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1.2rem; border-top: 1px dashed #ddd; padding-top: 12px; margin-top: 12px;">
                                     <span>Total</span>

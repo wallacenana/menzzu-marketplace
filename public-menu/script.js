@@ -2979,16 +2979,17 @@ async function loadCouponQuote() {
     return data;
 }
 
-function getCartPriceSummary(cart) {
+function getCartPriceSummary(cart, deliveryFee = 0) {
     const subtotal = cart.reduce((total, item) => total + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+    const fee = Math.max(0, Number(deliveryFee) || 0);
     const quote = state.couponQuote;
-    if (!quote || !state.couponCode) return { subtotal, discount: 0, total: subtotal };
+    if (!quote || !state.couponCode) return { subtotal, fee, discount: 0, total: subtotal + fee };
 
-    const rawDiscount = quote.discountType === 'percent'
+    const productDiscount = quote.discountType === 'percent'
         ? subtotal * (Math.min(Math.max(Number(quote.discountValue) || 0, 0), 100) / 100)
         : Number(quote.discountValue) || 0;
-    const discount = Math.min(Math.max(rawDiscount, 0), subtotal);
-    return { subtotal, discount, total: Math.max(0, subtotal - discount) };
+    const discount = Math.min(Math.max(productDiscount, 0), subtotal) + (quote.freeDelivery ? fee : 0);
+    return { subtotal, fee, discount, total: Math.max(0, subtotal + fee - discount) };
 }
 
 function renderCartStep() {
@@ -3337,14 +3338,16 @@ async function handleNextStep() {
 
 function updateStep4Summary() {
     const cart = getActiveCart();
-    const subtotal = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
     const fee = state.deliveryType === 'delivery' ? state.deliveryFee : 0;
-    const total = subtotal + fee;
+    const priceSummary = getCartPriceSummary(cart, fee);
 
     const subEl = document.getElementById('summary-subtotal');
     const feeEl = document.getElementById('summary-fee');
     const totalEl = document.getElementById('summary-total');
     const lineEl = document.getElementById('delivery-fee-line');
+    const couponLineEl = document.getElementById('coupon-discount-line');
+    const couponLabelEl = document.getElementById('summary-coupon-label');
+    const couponDiscountEl = document.getElementById('summary-coupon-discount');
     const listEl = document.getElementById('review-items-list');
     const paymentSummaryEl = document.getElementById('payment-method-summary');
     const scheduleReviewEl = document.getElementById('order-schedule-review');
@@ -3352,7 +3355,7 @@ function updateStep4Summary() {
 
     if (paymentSummaryEl) {
         if (state.paymentMethod === 'dinheiro') {
-            const totalForChange = subtotal + fee;
+            const totalForChange = priceSummary.total;
             const change = Number(state.cashChangeFor) > totalForChange ? Number(state.cashChangeFor) - totalForChange : 0;
             paymentSummaryEl.innerHTML = `<i data-lucide="banknote" style="vertical-align: middle; margin-right: 5px;"></i> Pagamento em Dinheiro${change > 0 ? ` · Troco: R$ ${change.toFixed(2).replace('.', ',')}` : ''}`;
             paymentSummaryEl.style.background = '#ffe4e6';
@@ -3371,10 +3374,15 @@ function updateStep4Summary() {
         scheduleReviewValueEl.innerText = showSchedule ? formatOrderSchedule() : 'Nenhum horário selecionado.';
     }
 
-    if (subEl) subEl.innerText = `R$ ${subtotal.toFixed(2)}`;
-    if (feeEl) feeEl.innerText = `R$ ${fee.toFixed(2)}`;
-    if (totalEl) totalEl.innerText = `R$ ${total.toFixed(2)}`;
+    if (subEl) subEl.innerText = `R$ ${priceSummary.subtotal.toFixed(2)}`;
+    if (feeEl) feeEl.innerText = `R$ ${priceSummary.fee.toFixed(2)}`;
+    if (totalEl) totalEl.innerText = `R$ ${priceSummary.total.toFixed(2)}`;
     if (lineEl) lineEl.classList.toggle('hidden', state.deliveryType !== 'delivery');
+    if (couponLineEl) couponLineEl.classList.toggle('hidden', !state.couponQuote);
+    if (couponLabelEl) couponLabelEl.innerText = `Cupom ${state.couponQuote?.code || state.couponCode || ''}`.trim();
+    if (couponDiscountEl) couponDiscountEl.innerText = priceSummary.discount > 0
+        ? `- R$ ${priceSummary.discount.toFixed(2)}`
+        : (state.couponQuote?.freeDelivery ? 'Frete grátis' : '- R$ 0.00');
 
     if (listEl) {
         listEl.innerHTML = cart.map(item => `
@@ -3597,7 +3605,7 @@ async function handlePlaceOrder() {
         }
     }
 
-    const totalValue = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) + (state.deliveryType === 'delivery' ? state.deliveryFee : 0);
+    const totalValue = getCartPriceSummary(cart, state.deliveryType === 'delivery' ? state.deliveryFee : 0).total;
     if (state.paymentMethod === 'dinheiro' && Number(state.cashChangeFor) > 0 && Number(state.cashChangeFor) < totalValue) {
         btn.disabled = false;
         btn.innerHTML = 'Fazer pedido';
@@ -3678,7 +3686,7 @@ async function handlePlaceOrder() {
         if (!response.ok) throw new Error(data.error || 'Não foi possível registrar o pedido.');
         if (data.paymentLink) {
             // Tracking: InitiateCheckout (Meta) & begin_checkout (GA4)
-            const totalValue = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) + (state.activeTab === 'delivery' ? state.deliveryFee : 0);
+            const totalValue = getCartPriceSummary(cart, state.activeTab === 'delivery' ? state.deliveryFee : 0).total;
             if (typeof fbq === 'function') {
                 fbq('track', 'InitiateCheckout', {
                     value: totalValue,
