@@ -2849,8 +2849,6 @@ function renderPaymentStep() {
     if (activeTypeButton && !activeTypeButton.querySelector('svg')) {
         setDeliveryType(state.deliveryType);
     }
-    if (saved.couponCode) state.couponCode = String(saved.couponCode).trim().toUpperCase();
-
     const addressDisplay = document.getElementById('delivery-address-display');
     if (addressDisplay) {
         addressDisplay.textContent = state.userInfo.address || 'Informe seu endereço';
