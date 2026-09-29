@@ -1214,8 +1214,15 @@ try {
                 <h2 id="restaurant-location-title">Onde você está?</h2>
                 <p>Informe seu endereço para calcular a entrega e mostrar as lojas mais próximas.</p>
                 <form id="restaurant-location-form">
-                    <input type="text" id="user-address" class="ifood-input" placeholder="Rua, número, bairro..." autocomplete="off" spellcheck="false">
-                    <input type="text" id="user-address-complement" class="ifood-input" placeholder="Complemento: apto, bloco, casa, ponto de referência..." autocomplete="address-line2" maxlength="160">
+                    <div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);gap:10px;">
+                        <input type="text" id="user-address-cep" class="ifood-input" placeholder="CEP" autocomplete="postal-code" inputmode="numeric" maxlength="9" required>
+                        <input type="text" id="user-address" class="ifood-input" placeholder="Rua / avenida" autocomplete="address-line1" spellcheck="false" required>
+                    </div>
+                    <div style="display:grid;grid-template-columns:minmax(0,0.7fr) minmax(0,1.3fr);gap:10px;">
+                        <input type="text" id="user-address-number" class="ifood-input" placeholder="Número" autocomplete="address-line2" inputmode="numeric" maxlength="16" required>
+                        <input type="text" id="user-address-complement" class="ifood-input" placeholder="Complemento (opcional)" autocomplete="address-line2" maxlength="160">
+                    </div>
+                    <small id="restaurant-location-coordinates" style="display:block;margin:2px 0 10px;color:#64748b;font-size:12px;">Confirme o endereço no mapa para calcular a entrega.</small>
                     <div id="restaurant-location-fee" class="restaurant-location-fee" hidden></div>
                     <button type="submit" class="primary-btn" disabled>Salvar endereço</button>
                 </form>
@@ -1295,22 +1302,42 @@ try {
                 const modal = document.getElementById('restaurant-location-modal');
                 const form = document.getElementById('restaurant-location-form');
                 const input = document.getElementById('user-address');
+                const cepInput = document.getElementById('user-address-cep');
+                const numberInput = document.getElementById('user-address-number');
                 const complementInput = document.getElementById('user-address-complement');
-                if (!modal || !form || !input || !complementInput) return;
+                if (!modal || !form || !input || !cepInput || !numberInput || !complementInput) return;
+
+                const isComplete = () => Boolean(
+                    input.value.trim()
+                    && numberInput.value.trim()
+                    && String(cepInput.value || '').replace(/\D/g, '').length === 8
+                );
+                const hasCoordinates = () => Number.isFinite(Number(input.dataset.latitude))
+                    && Number.isFinite(Number(input.dataset.longitude));
+                const refreshSubmitState = () => {
+                    if (!submitButton) return;
+                    submitButton.disabled = !isComplete();
+                    submitButton.innerText = hasCoordinates() ? 'Confirmar endereço' : 'Localizar e calcular taxa';
+                };
 
                 window.openRestaurantLocationModal = () => {
                     try {
                         const saved = JSON.parse(localStorage.getItem('menzzu_home_address') || '{}');
-                        input.value = String(saved.address || saved.formatted_address || input.value || '').trim();
+                        input.value = String(saved.addressStreet || saved.street || input.value || '').trim();
+                        cepInput.value = String(saved.postalCode || saved.cep || '').trim();
+                        numberInput.value = String(saved.addressNumber || saved.number || '').trim();
                         complementInput.value = String(saved.complement || '').trim();
+                        if (Number.isFinite(Number(saved.latitude)) && Number.isFinite(Number(saved.longitude))) {
+                            input.dataset.latitude = String(saved.latitude);
+                            input.dataset.longitude = String(saved.longitude);
+                        }
                     } catch (error) {
                         // Keep the current field values when saved data is invalid.
                     }
                     modal.classList.remove('hidden');
                     lockPage();
                     if (submitButton) {
-                        submitButton.disabled = !input.value.trim();
-                        submitButton.innerText = input.value.trim() ? 'Salvar localização' : 'Salvar endereço';
+                        refreshSubmitState();
                     }
                     input.focus({
                         preventScroll: true
@@ -1342,17 +1369,16 @@ try {
                     window.scrollTo(0, scrollY);
                 };
                 modal.querySelector('.restaurant-location-backdrop')?.addEventListener('click', close);
-                input.addEventListener('input', () => {
+                [cepInput, input, numberInput, complementInput].forEach((field) => field.addEventListener('input', () => {
                     modal.dataset.calculatedAddress = '';
                     if (feeDisplay) {
                         feeDisplay.hidden = true;
                         feeDisplay.innerHTML = '';
                     }
                     if (submitButton) {
-                        submitButton.disabled = !input.value.trim();
-                        submitButton.innerText = input.value.trim() ? 'Calcular taxa' : 'Salvar endereço';
+                        refreshSubmitState();
                     }
-                });
+                }));
 
                 try {
                     const rawEntry = localStorage.getItem('menzzu_marketplace_store_entry') || '';
@@ -1368,9 +1394,10 @@ try {
 
                 form.addEventListener('submit', (event) => {
                     event.preventDefault();
-                    const address = input.value.trim();
+                    const addressData = window.getStructuredAddress?.();
+                    const address = String(addressData?.displayAddress || '').trim();
                     const complement = complementInput.value.trim();
-                    if (!address) {
+                    if (!addressData?.isComplete) {
                         input.focus();
                         return;
                     }
@@ -1381,22 +1408,35 @@ try {
                     } catch (error) {
                         saved = {};
                     }
-                    const selectedCoordinates = input.dataset.placeSelected === '1'
-                        ? { lat: saved.lat ?? null, lng: saved.lng ?? null }
-                        : { lat: null, lng: null };
+                    const selectedCoordinates = hasCoordinates()
+                        ? { latitude: Number(input.dataset.latitude), longitude: Number(input.dataset.longitude) }
+                        : null;
+
+                    if (!selectedCoordinates) {
+                        window.geocodeAddress?.(addressData.searchAddress);
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                            submitButton.innerText = 'Localizando no mapa...';
+                        }
+                        return;
+                    }
 
                     if (modal.dataset.calculatedAddress === address) {
                         localStorage.setItem('menzzu_home_address', JSON.stringify({
                             ...saved,
                             address,
                             formatted_address: address,
+                            street: addressData.street,
+                            number: addressData.number,
+                            postalCode: addressData.postalCode,
                             complement,
                             ...selectedCoordinates
                         }));
                         window.dispatchEvent(new CustomEvent('menzzu-address-saved', {
                             detail: {
                                 address: complement ? `${address}, ${complement}` : address,
-                                coordinates: selectedCoordinates
+                                coordinates: selectedCoordinates,
+                                addressData
                             }
                         }));
                         close();
@@ -1404,7 +1444,7 @@ try {
                     }
 
                     window.dispatchEvent(new CustomEvent('menzzu-address-selected', {
-                        detail: { address, coordinates: selectedCoordinates }
+                        detail: { address, coordinates: selectedCoordinates, addressData }
                     }));
                     modal.dataset.calculatedAddress = address;
                     if (submitButton) {

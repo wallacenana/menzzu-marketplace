@@ -947,11 +947,15 @@ function loadGoogleMaps(apiKey) {
 
 window.initMapsAutocomplete = () => {
     const input = document.getElementById('user-address');
+    const cepInput = document.getElementById('user-address-cep');
+    const numberInput = document.getElementById('user-address-number');
     if (!input) return;
 
     try {
         input.dataset.placeSelected = '0';
-        const autocomplete = new google.maps.places.Autocomplete(input);
+        const autocomplete = new google.maps.places.Autocomplete(input, {
+            fields: ['address_components', 'formatted_address', 'geometry']
+        });
         autocomplete.setComponentRestrictions({
             country: 'br'
         });
@@ -961,30 +965,34 @@ window.initMapsAutocomplete = () => {
             const place = autocomplete.getPlace();
             if (!place.geometry) return;
             input.dataset.placeSelected = '1';
-            updateLocation(place.geometry.location, place.formatted_address);
+            populateAddressFields(place);
+            updateLocation(place.geometry.location, place.formatted_address, place);
         });
 
-        input.addEventListener('input', () => {
-            input.dataset.placeSelected = '0';
-        }, { passive: true });
+        [cepInput, input, numberInput].filter(Boolean).forEach((field) => {
+            field.addEventListener('input', () => clearAddressCoordinates(), { passive: true });
+            field.addEventListener('change', () => {
+                if (getStructuredAddress().isComplete) geocodeAddress(getStructuredAddress().searchAddress);
+            });
+        });
 
         input.addEventListener('change', () => {
-            const value = input.value.trim();
-            if (!value || input.dataset.placeSelected === '1') return;
-            setTimeout(() => geocodeAddress(value), 120);
+            const address = getStructuredAddress();
+            if (!address.isComplete || input.dataset.placeSelected === '1') return;
+            setTimeout(() => geocodeAddress(address.searchAddress), 120);
         });
 
         input.addEventListener('blur', () => {
-            const value = input.value.trim();
-            if (!value || input.dataset.placeSelected === '1') return;
-            setTimeout(() => geocodeAddress(value), 120);
+            const address = getStructuredAddress();
+            if (!address.isComplete || input.dataset.placeSelected === '1') return;
+            setTimeout(() => geocodeAddress(address.searchAddress), 120);
         });
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const value = input.value.trim();
-                if (value) geocodeAddress(value);
+                const address = getStructuredAddress();
+                if (address.isComplete) geocodeAddress(address.searchAddress);
                 input.blur();
             }
         });
@@ -1032,24 +1040,119 @@ function initDeliveryMap() {
     }
 }
 
+function getStructuredAddress() {
+    const streetInput = document.getElementById('user-address');
+    const numberInput = document.getElementById('user-address-number');
+    const cepInput = document.getElementById('user-address-cep');
+    const complementInput = document.getElementById('user-address-complement');
+    const street = String(streetInput?.value || '').trim();
+    const number = String(numberInput?.value || '').trim();
+    const postalCode = String(cepInput?.value || '').replace(/\D/g, '').replace(/(\d{5})(\d{0,3})/, '$1-$2').replace(/-$/, '');
+    const complement = String(complementInput?.value || '').trim();
+    const locality = String(streetInput?.dataset.locality || '').trim();
+    const region = String(streetInput?.dataset.region || '').trim();
+    const base = [street, number].filter(Boolean).join(', ');
+    const localityLabel = [locality, region].filter(Boolean).join(' - ');
+    const displayAddress = [
+        base,
+        complement ? `Complemento: ${complement}` : '',
+        postalCode ? `CEP ${postalCode}` : '',
+        localityLabel
+    ].filter(Boolean).join(' - ');
+    return {
+        street,
+        number,
+        postalCode,
+        complement,
+        displayAddress,
+        searchAddress: [base, postalCode, localityLabel, 'Brasil'].filter(Boolean).join(', '),
+        isComplete: Boolean(street && number && postalCode.length === 9)
+    };
+}
+
+function populateAddressFields(place) {
+    const streetInput = document.getElementById('user-address');
+    const numberInput = document.getElementById('user-address-number');
+    const cepInput = document.getElementById('user-address-cep');
+    if (!streetInput) return;
+    const components = Array.isArray(place?.address_components) ? place.address_components : [];
+    const byType = (type) => components.find(component => component.types?.includes(type))?.long_name || '';
+    const route = byType('route');
+    const number = byType('street_number');
+    const postalCode = byType('postal_code');
+    const locality = byType('sublocality_level_1') || byType('neighborhood') || byType('administrative_area_level_2');
+    const region = byType('administrative_area_level_1');
+    if (route) streetInput.value = route;
+    if (number && numberInput) numberInput.value = number;
+    if (postalCode && cepInput) cepInput.value = postalCode.replace(/(\d{5})(\d{3})/, '$1-$2');
+    streetInput.dataset.locality = locality;
+    streetInput.dataset.region = region;
+}
+
+function getLocationCoordinates(location) {
+    const latitude = typeof location?.lat === 'function' ? location.lat() : Number(location?.lat);
+    const longitude = typeof location?.lng === 'function' ? location.lng() : Number(location?.lng);
+    return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+}
+
+function clearAddressCoordinates() {
+    const streetInput = document.getElementById('user-address');
+    const status = document.getElementById('restaurant-location-coordinates');
+    if (!streetInput) return;
+    streetInput.dataset.placeSelected = '0';
+    delete streetInput.dataset.latitude;
+    delete streetInput.dataset.longitude;
+    delete state.userInfo.latitude;
+    delete state.userInfo.longitude;
+    if (status) status.textContent = 'Confirme o endereço no mapa para calcular a entrega.';
+}
+
 function geocodeAddress(address) {
     if (!state.geocoder) return;
     state.geocoder.geocode({
         address: address
     }, (results, status) => {
-        if (status === 'OK' && results[0]) updateLocation(results[0].geometry.location, results[0].formatted_address);
+        if (status === 'OK' && results[0]) {
+            populateAddressFields(results[0]);
+            updateLocation(results[0].geometry.location, results[0].formatted_address, results[0]);
+        }
     });
 }
 
-function updateLocation(location, address = null) {
-    if (!state.googleMap) return;
-    state.googleMap.panTo(location);
-    state.mapMarker.setPosition(location);
-    if (address) {
-        document.getElementById('user-address').value = address;
-        state.userInfo.address = address;
+function updateLocation(location, address = null, place = null) {
+    const coordinates = getLocationCoordinates(location);
+    const streetInput = document.getElementById('user-address');
+    if (place) populateAddressFields(place);
+    if (coordinates && streetInput) {
+        streetInput.dataset.placeSelected = '1';
+        streetInput.dataset.latitude = String(coordinates.latitude);
+        streetInput.dataset.longitude = String(coordinates.longitude);
+        state.userInfo.latitude = coordinates.latitude;
+        state.userInfo.longitude = coordinates.longitude;
+    }
+    if (state.googleMap) {
+        state.googleMap.panTo(location);
+        if (state.mapMarker) state.mapMarker.setPosition(location);
+    }
+    const structuredAddress = getStructuredAddress();
+    if (structuredAddress.isComplete && coordinates) {
+        state.userInfo.address = structuredAddress.displayAddress;
+        state.userInfo.postalCode = structuredAddress.postalCode;
+        state.userInfo.addressStreet = structuredAddress.street;
+        state.userInfo.addressNumber = structuredAddress.number;
+        state.userInfo.addressComplement = structuredAddress.complement;
         localStorage.setItem('menzzu_user', JSON.stringify(state.userInfo));
-        calculateDeliveryFee(address);
+        const status = document.getElementById('restaurant-location-coordinates');
+        if (status) status.textContent = 'Localização confirmada no mapa.';
+        const modal = document.getElementById('restaurant-location-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            modal.dataset.calculatedAddress = structuredAddress.displayAddress;
+            window.dispatchEvent(new CustomEvent('menzzu-address-selected', {
+                detail: { address: structuredAddress.displayAddress, coordinates, addressData: structuredAddress }
+            }));
+        } else {
+            calculateDeliveryFee(structuredAddress.displayAddress, coordinates);
+        }
     }
 }
 
@@ -1057,11 +1160,11 @@ function reverseGeocode(latLng) {
     state.geocoder.geocode({
         location: latLng
     }, (results, status) => {
-        if (status === 'OK' && results[0]) updateLocation(latLng, results[0].formatted_address);
+        if (status === 'OK' && results[0]) updateLocation(latLng, results[0].formatted_address, results[0]);
     });
 }
 
-async function calculateDeliveryFee(address) {
+async function calculateDeliveryFee(address, coordinates = null) {
     try {
         const response = await fetch(`${API_BASE}/orders/calculate-fee`, {
             method: 'POST',
@@ -1070,6 +1173,8 @@ async function calculateDeliveryFee(address) {
             },
             body: JSON.stringify({
                 address,
+                lat: coordinates?.latitude ?? state.userInfo.latitude,
+                lng: coordinates?.longitude ?? state.userInfo.longitude,
                 slug: STORE_SLUG
             })
         });
@@ -2473,7 +2578,7 @@ function initEventListeners() {
 
     window.addEventListener('menzzu-address-selected', async (event) => {
         const address = event.detail?.address || '';
-        const result = await calculateDeliveryFee(address);
+        const result = await calculateDeliveryFee(address, event.detail?.coordinates || null);
         const modal = document.getElementById('restaurant-location-modal');
         const submitButton = modal?.querySelector('button[type="submit"]');
         if (result?.fee !== undefined && submitButton) {
@@ -2490,6 +2595,12 @@ function initEventListeners() {
         const address = String(event.detail?.address || '').trim();
         if (!address) return;
         state.userInfo.address = address;
+        state.userInfo.postalCode = event.detail?.addressData?.postalCode || state.userInfo.postalCode || '';
+        state.userInfo.addressStreet = event.detail?.addressData?.street || state.userInfo.addressStreet || '';
+        state.userInfo.addressNumber = event.detail?.addressData?.number || state.userInfo.addressNumber || '';
+        state.userInfo.addressComplement = event.detail?.addressData?.complement || state.userInfo.addressComplement || '';
+        if (Number.isFinite(Number(event.detail?.coordinates?.latitude))) state.userInfo.latitude = Number(event.detail.coordinates.latitude);
+        if (Number.isFinite(Number(event.detail?.coordinates?.longitude))) state.userInfo.longitude = Number(event.detail.coordinates.longitude);
         localStorage.setItem('menzzu_user', JSON.stringify(state.userInfo));
         const addressDisplay = document.getElementById('delivery-address-display');
         if (addressDisplay) addressDisplay.textContent = address;
@@ -2638,7 +2749,7 @@ function initEventListeners() {
 
     document.getElementById('user-name').value = state.userInfo.name || '';
     document.getElementById('user-phone').value = state.userInfo.phone || '';
-    document.getElementById('user-address').value = state.userInfo.address || '';
+    document.getElementById('user-address').value = state.userInfo.addressStreet || '';
 
     const phoneInput = document.getElementById('user-phone');
     if (phoneInput) {
@@ -2649,7 +2760,7 @@ function initEventListeners() {
         });
     }
 
-    ['user-name', 'user-address'].forEach(id => {
+    ['user-name'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('input', (e) => {
@@ -3071,7 +3182,8 @@ async function handleNextStep() {
         goToStep(4);
     } else if (state.currentStep === 4) {
         if (state.activeTab === 'delivery') {
-            if (state.deliveryType === 'delivery' && !state.userInfo.address) return showAlert('Endereço Ausente', 'Por favor, selecione seu endereço no mapa.');
+            const hasCoordinates = Number.isFinite(Number(state.userInfo.latitude)) && Number.isFinite(Number(state.userInfo.longitude));
+            if (state.deliveryType === 'delivery' && (!state.userInfo.address || !hasCoordinates)) return showAlert('Endereço Ausente', 'Informe CEP, rua e número e confirme a localização no mapa.');
             if (state.deliveryFee === 0 && state.deliveryType === 'delivery' && state.userInfo.address) {
                 return showAlert('Taxa Indisponível', 'Por favor, aguarde o cálculo da taxa de entrega ou verifique se o endereço está no raio de entrega.');
             }
@@ -3378,6 +3490,8 @@ async function handlePlaceOrder() {
         deliveryAddress: state.deliveryType === 'delivery'
             ? state.userInfo.address
             : (state.deliveryType === 'local' ? 'Consumo no Local' : 'Retirada na Loja'),
+        deliveryLatitude: state.deliveryType === 'delivery' ? state.userInfo.latitude : null,
+        deliveryLongitude: state.deliveryType === 'delivery' ? state.userInfo.longitude : null,
         scheduledDate: state.activeTab === 'order' ? state.orderSchedule?.date || null : null,
         scheduledTime: state.activeTab === 'order' ? state.orderSchedule?.time || null : null,
         couponCode: state.couponCode || null,
