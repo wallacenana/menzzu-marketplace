@@ -319,9 +319,11 @@ try {
     $stmt->execute([$store['id']]);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $pdo->prepare("SELECT id, dayOfWeek, startTime, endTime, maxOrders FROM available_slot WHERE userId = ? ORDER BY dayOfWeek ASC, startTime ASC");
+    $stmt = $pdo->prepare("SELECT id, dayOfWeek, startTime, endTime, maxOrders, slotType FROM available_slot WHERE userId = ? ORDER BY slotType ASC, dayOfWeek ASC, startTime ASC");
     $stmt->execute([$store['id']]);
     $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $deliverySlots = array_values(array_filter($availableSlots, static fn($slot) => ($slot['slotType'] ?? 'delivery') === 'delivery'));
+    $orderSlots = array_values(array_filter($availableSlots, static fn($slot) => ($slot['slotType'] ?? 'delivery') === 'order'));
 
     // JSON-LD reflects only the business data already visible on this menu page.
     $usesHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -334,7 +336,7 @@ try {
         4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'
     ];
     $openingHoursSpecification = [];
-    foreach ($availableSlots as $slot) {
+    foreach ($deliverySlots as $slot) {
         $day = (int) ($slot['dayOfWeek'] ?? -1);
         $opens = substr((string) ($slot['startTime'] ?? ''), 0, 5);
         $closes = substr((string) ($slot['endTime'] ?? ''), 0, 5);
@@ -392,7 +394,7 @@ try {
     })) > 0;
     $marketplaceReady = !empty($store['logoUrl'])
         && (float) ($store['maxDeliveryKm'] ?? 0) > 0
-        && count($availableSlots) > 0
+        && (count($deliverySlots) > 0 || count($orderSlots) > 0)
         && $hasVisibleProduct;
 
     $stmt = $pdo->prepare("SELECT * FROM addon_group WHERE userId = ?");
@@ -435,7 +437,9 @@ try {
         'googleApiKey' => getenv('GOOGLE_MAPS_API_KEY') ?: getenv('GOOGLE_MAPS_KEY') ?: getenv('GOOGLE_API_KEY') ?: ($store['googleApiKey'] ?? ''),
         'deliveryRules' => $store['deliveryRules'] ?? '[]',
         'maxDeliveryKm' => (float) ($store['maxDeliveryKm'] ?? 15),
-        'availableSlots' => $availableSlots,
+        'availableSlots' => $deliverySlots,
+        'deliverySlots' => $deliverySlots,
+        'orderSlots' => $orderSlots,
         'pixelId' => $store['pixelId'] ?? '',
         'microsoftClarityId' => $store['microsoftClarityId'] ?? '',
         'googleAnalyticsId' => $store['googleAnalyticsId'] ?? '',
@@ -1007,7 +1011,7 @@ try {
                                 <a class="store-navigation-btn" target="_blank" rel="noopener" href="<?php echo htmlspecialchars($storeMapUrl, ENT_QUOTES, 'UTF-8'); ?>">Iniciar navegação</a>
                             </div>
                             <div id="order-schedule-notice" class="order-schedule-notice" hidden></div>
-                            <?php echo renderReceivingHours($availableSlots); ?>
+                            <?php echo renderReceivingHours($deliverySlots); ?>
                         </div>
 
                         <div id="local-info-panel" class="receiving-mode-panel">
@@ -1023,7 +1027,7 @@ try {
                                 <a class="store-navigation-btn" target="_blank" rel="noopener" href="<?php echo htmlspecialchars($storeMapUrl, ENT_QUOTES, 'UTF-8'); ?>">Iniciar navegação</a>
                             </div>
                             <div id="order-schedule-notice-local" class="order-schedule-notice" hidden></div>
-                            <?php echo renderReceivingHours($availableSlots); ?>
+                            <?php echo renderReceivingHours($deliverySlots); ?>
                         </div>
 
                     </div>
@@ -1132,7 +1136,7 @@ try {
                                 6 => 'Sab'
                             ];
                             $slotsByDay = [];
-                            foreach ($availableSlots as $slot) {
+                            foreach ($deliverySlots as $slot) {
                                 $day = (int) ($slot['dayOfWeek'] ?? 0);
                                 $slotsByDay[$day][] = substr((string) ($slot['startTime'] ?? '00:00'), 0, 5) . ' - ' . substr((string) ($slot['endTime'] ?? '00:00'), 0, 5);
                             }

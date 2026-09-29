@@ -142,6 +142,8 @@ let state = {
     withinDeliveryRadius: false,
     withinDeliveryRadius: false,
     availableSlots: [],
+    deliverySlots: [],
+    orderSlots: [],
     addonGroups: [],
     orderAvailabilityRequestId: 0,
     orderAvailability: null,
@@ -780,7 +782,9 @@ function hydrateFromSSR() {
         };
         state.products = data.products || [];
         state.categories = data.categories || [];
-        state.availableSlots = data.availableSlots || [];
+        state.deliverySlots = data.deliverySlots || data.availableSlots || [];
+        state.orderSlots = data.orderSlots || data.availableSlots || [];
+        state.availableSlots = state.deliverySlots;
         state.addonGroups = data.addonGroups || [];
         state.storeReviewSummary = data.reviewSummary || state.storeReviewSummary || {
             averageRating: 5,
@@ -892,13 +896,13 @@ function checkStoreStatus() {
     const hasMinimumSetup = state.publicSettings.marketplaceReady === true
         && state.publicSettings.hasLogo === true
         && Number(state.publicSettings.maxDeliveryKm || 0) > 0
-        && state.availableSlots.length > 0
+        && (state.deliverySlots.length > 0 || (isOrderEnabled() && state.orderSlots.length > 0))
         && state.products.some(product => product && product.active !== false && String(product.type || '').toLowerCase() !== 'addon');
     const now = new Date();
     const day = now.getDay();
     const time = now.getHours() * 60 + now.getMinutes();
 
-    const todaySlots = state.availableSlots.filter(s => s.dayOfWeek === day);
+    const todaySlots = state.deliverySlots.filter(s => s.dayOfWeek === day);
     state.isOpen = todaySlots.some(s => {
         const [sh, sm] = s.startTime.split(':').map(Number);
         const [eh, em] = s.endTime.split(':').map(Number);
@@ -910,7 +914,7 @@ function checkStoreStatus() {
     const ordersPaused = state.publicSettings.acceptOrders === false;
     const statusLabel = ordersPaused
         ? 'Fechado agora'
-        : (!hasMinimumSetup ? 'Inativo' : state.isOpen ? 'Aberto' : (isOrderEnabled() ? 'Apenas encomendas' : 'Fechado'));
+        : (!hasMinimumSetup ? 'Inativo' : state.isOpen ? 'Aberto' : (isOrderEnabled() && state.orderSlots.length > 0 ? 'Apenas encomendas' : 'Fechado'));
     const statusClass = ordersPaused || !hasMinimumSetup || !state.isOpen
         ? 'status-badge closed'
         : 'status-badge open';
