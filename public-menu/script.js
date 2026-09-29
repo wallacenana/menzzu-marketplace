@@ -2965,7 +2965,15 @@ async function loadCouponQuote() {
     }
 
     const response = await fetch(`${API_BASE}/orders/coupon-preview?slug=${encodeURIComponent(STORE_SLUG)}&couponCode=${encodeURIComponent(code)}`);
-    const data = await response.json();
+    let data = null;
+    try {
+        data = await response.json();
+    } catch (error) {
+        if (response.status === 404) {
+            throw new Error('A validação de cupons está sendo atualizada. Tente novamente em alguns minutos.');
+        }
+        throw new Error('Não foi possível validar o cupom agora. Tente novamente.');
+    }
     if (!response.ok) throw new Error(data.error || 'Cupom inválido.');
     state.couponQuote = data;
     return data;
