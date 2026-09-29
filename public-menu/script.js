@@ -148,6 +148,7 @@ let state = {
     orderAvailabilityRequestId: 0,
     orderAvailability: null,
     orderSchedule: null,
+    couponCode: '',
     scheduleModalContext: null,
     bodyScrollY: 0,
     isBodyScrollLocked: false,
@@ -621,7 +622,8 @@ async function loadOrderAvailability(dateStr, preserveSelection = true, config =
     timeSelect.innerHTML = `<option value="">Carregando horários...</option>`;
 
     try {
-        const response = await fetch(`${API_BASE}/orders/availability?slug=${encodeURIComponent(STORE_SLUG)}&date=${encodeURIComponent(cleanDate)}&type=order`);
+        const couponQuery = state.couponCode ? `&couponCode=${encodeURIComponent(state.couponCode)}` : '';
+        const response = await fetch(`${API_BASE}/orders/availability?slug=${encodeURIComponent(STORE_SLUG)}&date=${encodeURIComponent(cleanDate)}&type=order${couponQuery}`);
         const data = await response.json();
 
         if (requestId !== state.orderAvailabilityRequestId) return data;
@@ -2614,6 +2616,18 @@ function initEventListeners() {
     }
 
     document.getElementById('confirm-schedule-btn')?.addEventListener('click', commitScheduleAndMaybeAdd);
+    document.getElementById('apply-schedule-coupon')?.addEventListener('click', async () => {
+        const input = document.getElementById('schedule-coupon');
+        const dateInput = document.getElementById('schedule-date');
+        state.couponCode = String(input?.value || '').trim().toUpperCase();
+        if (input) input.value = state.couponCode;
+        saveCheckoutState();
+        await loadOrderAvailability(dateInput?.value || '', false, {
+            timeSelectId: 'schedule-time',
+            dateInputId: 'schedule-date',
+            noteId: 'schedule-availability-note'
+        });
+    });
     document.getElementById('schedule-time')?.addEventListener('change', async (e) => {
         if (!e.target.value) return;
         const noteEl = document.getElementById('schedule-availability-note');
@@ -2702,6 +2716,7 @@ function saveCheckoutState() {
         paymentMethod: state.paymentMethod,
         deliveryFee: state.deliveryFee || 0,
         orderSchedule: state.orderSchedule || null,
+        couponCode: state.couponCode || '',
         orderDetailsInfo: state.orderDetailsInfo || '',
         expires: Date.now() + (24 * 60 * 60 * 1000)
     };
@@ -2834,6 +2849,7 @@ function renderPaymentStep() {
     if (activeTypeButton && !activeTypeButton.querySelector('svg')) {
         setDeliveryType(state.deliveryType);
     }
+    if (saved.couponCode) state.couponCode = String(saved.couponCode).trim().toUpperCase();
 
     const addressDisplay = document.getElementById('delivery-address-display');
     if (addressDisplay) {
@@ -3360,6 +3376,7 @@ async function handlePlaceOrder() {
             : (state.deliveryType === 'local' ? 'Consumo no Local' : 'Retirada na Loja'),
         scheduledDate: state.activeTab === 'order' ? state.orderSchedule?.date || null : null,
         scheduledTime: state.activeTab === 'order' ? state.orderSchedule?.time || null : null,
+        couponCode: state.activeTab === 'order' ? state.couponCode || null : null,
         deliveryFee: state.deliveryType === 'delivery' ? state.deliveryFee : 0,
         paymentMethod: String(state.paymentMethod || '').trim().toLowerCase() === 'dinheiro' ? 'dinheiro' : state.paymentMethod,
         totalValue: totalValue,

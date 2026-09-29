@@ -929,6 +929,13 @@ try {
                         <input type="date" id="schedule-date" class="ifood-input">
                     </div>
                     <div class="form-group">
+                        <label class="field-label">Cupom (opcional)</label>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="schedule-coupon" class="ifood-input" placeholder="Ex.: VIPMANHA" autocomplete="off" style="text-transform:uppercase;">
+                            <button type="button" id="apply-schedule-coupon" class="secondary-btn" style="white-space:nowrap;">Aplicar</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label class="field-label">Horário</label>
                         <select id="schedule-time" class="ifood-input">
                             <option value="">Selecione uma data primeiro</option>
