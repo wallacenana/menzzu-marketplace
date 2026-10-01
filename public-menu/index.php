@@ -229,7 +229,7 @@ try {
     }
 
     $cacheDir = __DIR__ . '/cache';
-    $cacheVersion = @filemtime(__FILE__) ?: time();
+    $cacheVersion = max(@filemtime(__FILE__) ?: 0, @filemtime(__DIR__ . '/script.js') ?: 0);
     $cacheFile = $cacheDir . '/store_' . md5($slug . '_ao_' . ($cacheAcceptOrders ? '1' : '0') . '_sv_' . $cacheVersionStamp . '_v_' . $cacheVersion) . '.html';
     $cacheTime = 60; // 60 segundos de cache
 

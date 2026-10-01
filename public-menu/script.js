@@ -59,14 +59,38 @@ function persistActiveTab() {
     }
 }
 
-function productShareSlug(product) {
-    const name = String(product?.name || 'produto')
+function productSlugName(product) {
+    return String(product?.name || 'produto')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '') || 'produto';
-    return `${name}-${product.id}`;
+}
+
+function productSlugBase(product) {
+    const name = productSlugName(product);
+    if (name.length <= 50) return name;
+    const prefix = name.slice(0, 50);
+    const boundary = prefix.lastIndexOf('-');
+    return boundary > 0 ? prefix.slice(0, boundary) : prefix;
+}
+
+function productShareSlug(product) {
+    const name = productSlugBase(product);
+    const others = (state.products || []).filter(item => String(item.id) !== String(product.id));
+    if (!others.some(item => productSlugBase(item) === name)) return name;
+
+    // Use only enough of the ID to distinguish products with the same name.
+    const id = String(product.id);
+    for (let length = Math.min(6, id.length); length <= id.length; length++) {
+        const suffix = id.slice(0, length);
+        const candidate = `${name}-${suffix}`;
+        const collision = others.some(item => productSlugBase(item) === candidate ||
+            (productSlugBase(item) === name && String(item.id).slice(0, length) === suffix));
+        if (!collision) return candidate;
+    }
+    return `${name}-${id}`;
 }
 
 function setProductUrl(product) {
@@ -85,7 +109,10 @@ function clearProductUrl() {
 function getProductFromUrl() {
     const productSlug = new URLSearchParams(window.location.search).get('p');
     if (!productSlug) return null;
-    return (state.products || []).find(product => productShareSlug(product) === productSlug) || null;
+    const products = state.products || [];
+    // Previously shared links included the full name and ID.
+    return products.find(product => `${productSlugName(product)}-${product.id}` === productSlug) ||
+        products.find(product => productShareSlug(product) === productSlug) || null;
 }
 
 
